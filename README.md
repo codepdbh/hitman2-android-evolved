@@ -5,9 +5,9 @@ mediante recompilación estática con [PCRecomp](https://github.com/sp00nznet/pc
 Sin Wine, sin Winlator, sin emulación permanente de x86, sin streaming.
 
 > **Estado real (2026-11-09): laboratorio, no juego.** El ejecutable original se levanta
-> entero a C y compila para ARM64; una muestra de sus funciones se comporta igual que el
-> x86 original en PC y en un teléfono real. El APK que existe es de diagnóstico: no
-> contiene ni ejecuta el juego. No hay render, audio ni controles.
+> entero a C, y ese código recompilado **arranca en PC y en un teléfono ARM64 real** desde su
+> punto de entrada hasta `WinMain`, donde se detiene al pedir su ventana. El APK que existe
+> es de diagnóstico: no contiene ni ejecuta el juego. No hay ventana, render, audio ni controles.
 > El detalle está en [docs/STATUS.md](docs/STATUS.md).
 
 Este repositorio no contiene ni contendrá el juego, sus recursos ni código derivado
@@ -26,6 +26,9 @@ de sus binarios. Necesitas tu propia copia legítima.
 - La misma prueba en ARM64 real (Galaxy S25 Ultra, por adb): 544/544 vectores idénticos al host.
 - `hitman2.exe` completo: 21.336 entradas levantadas, 1,21 M de líneas de C, 72/72 unidades
   compiladas para `arm64-v8a`. Quedan 505 instrucciones sin traducir en 112 funciones.
+- **Sonda de arranque**: el programa recompilado completo, enlazado con el cargador PE y 73 de sus
+  151 imports Win32, ejecuta su CRT y entra en `WinMain` (3.736 llamadas internas, 583 llamadas
+  Win32). Mismo resultado en x86-64 y en ARM64 real. Se detiene en `USER32!GetClassInfoExA`.
 - APK de diagnóstico (`android/`): carga `libh2ae.so` y pasa la autoprueba del runtime (22/22) en el dispositivo.
 
 ## Requisitos (los que se usaron)
@@ -70,6 +73,10 @@ python scripts/lift_image.py compile --target arm64
 # 7. Autoprueba del runtime en el PC
 python scripts/run_selftest.py
 
+# 7b. Arrancar el programa recompilado (consola, sin ventana); dice dónde se detiene y por qué
+python scripts/boot_probe.py --calls
+python scripts/boot_probe.py --android <serie>     # lo mismo en el dispositivo, y compara
+
 # 8. APK de diagnóstico (JDK 17-21; se usó el JBR de Android Studio)
 python tools/make_icons.py
 $env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
@@ -96,7 +103,9 @@ El informe queda en `build/difftest/report.json`; una copia sin código derivado
 | `scripts/` | `worksafe.py` (lanzador obligatorio), `toolchain.py`, `difftest_game.py`, `audit_repo.py` |
 | `tools/` | `pe_inventory.py`, `prepare_image.py`, `gen_portable_cpu.py` |
 | `recomp/` | `h2_lifter.py`; `catalog/` y `generated/` son locales y no se versionan |
-| `runtime/` | Memoria invitada y ayudas x87 |
+| `runtime/` | Capa 2: memoria invitada, despacho de direcciones, x87, registro, parada controlada |
+| `platform/` | Capa 3: cargador PE, imports, montón, handles, archivos, KERNEL32 (C portable, sin cabeceras de Windows ni de Android) |
+| `pc_test/` | Sonda de arranque de consola |
 | `tests/difftest/` | Arnés C y lista de divergencias conocidas |
 | `analysis/` | Informes de ingeniería inversa |
 | `docs/` | Estado, problemas conocidos, decisión de renderizador, evidencia |
@@ -104,7 +113,7 @@ El informe queda en `build/difftest/report.json`; una copia sin código derivado
 
 | `android/` | App de diagnóstico (Kotlin + JNI + CMake); `branding/icono.png` es el icono fuente |
 
-`platform/`, `renderer/`, `input/`, `audio/` y `pc_test/` se crearán cuando tengan contenido real.
+`renderer/`, `input/` y `audio/` se crearán cuando tengan contenido real.
 
 ## Documentos
 

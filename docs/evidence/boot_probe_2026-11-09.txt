@@ -1,0 +1,26 @@
+﻿Hitman 2: Android Evolved - sonda de arranque (scripts/boot_probe.py --calls --android <serie>)
+Fecha: 2026-11-09. Programa: hitman2.exe 1.0.0.265 levantado completo (21.336 entradas) + runtime + platform/.
+Consola, sin ventana. El .exe del usuario se carga como datos; el código ejecutado es el C levantado.
+
+Host x86-64 (clang, Windows 11):
+  RESULT reason=unimplemented-import dispatches=3736 imports_called=33 import_calls=583 implemented=73 bound=151
+  stopped: USER32.dll!GetClassInfoExA is not implemented (called from guest 00417D1F)
+
+ARM64 real (SM-S938B, arm64-v8a, Android 17, binario de consola en /data/local/tmp, borrado al terminar):
+  RESULT reason=unimplemented-import dispatches=3736 imports_called=33 import_calls=583 implemented=73 bound=151
+  stopped: USER32.dll!GetClassInfoExA is not implemented (called from guest 00417D1F)
+  -> mismo punto de parada y mismos contadores que el host: SI
+
+Recorrido: WinMainCRTStartup (montón, entorno, tablas de configuración regional, inicializadores C++)
+-> WinMain -> mutex de instancia única -> RegisterWindowMessageA -> registro de la clase de ventana (parada).
+
+Imports llamados (host): HeapSize 421, HeapReAlloc 78, EnterCriticalSection 12, LeaveCriticalSection 12,
+HeapAlloc 11, MultiByteToWideChar 6, LCMapStringW 5, WideCharToMultiByte 4, GetStdHandle 3, GetFileType 3,
+GetModuleHandleA 2, GetStartupInfoA 2, GetStringTypeW 2, GetCPInfo 2, GetModuleFileNameA 2, y con 1 llamada:
+HeapFree, GetProcAddress, GetSystemTimeAsFileTime, InitializeCriticalSection, GetCommandLineA, GetVersion,
+GetVersionExA, HeapCreate, SetHandleCount, FreeEnvironmentStringsW, GetEnvironmentStringsW,
+SetUnhandledExceptionFilter, GetACP, CreateMutexA, GetLastError, RegisterWindowMessageA,
+IsProcessorFeaturePresent, GetClassInfoExA (no implementado).
+
+Alcance: 73 de 151 imports implementados. No hay ventana, render, audio, entrada ni hilos. El sistema de
+archivos (CreateFileA, ReadFile, ...) está implementado pero el programa aún no lo ha usado en este recorrido.

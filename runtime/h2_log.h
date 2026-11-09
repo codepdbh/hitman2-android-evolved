@@ -28,6 +28,24 @@ void h2_log(h2_log_cat cat, h2_log_lvl lvl, const char *fmt, ...);
 void h2_log_set_sink(h2_log_sink sink, void *user);
 const char *h2_log_cat_name(h2_log_cat cat);
 
+/* Why the guest stopped. Only H2_STOP_EXIT is a normal ending. */
+typedef enum {
+    H2_STOP_EXIT,                 /* the program called ExitProcess */
+    H2_STOP_UNTRANSLATED,         /* reached an instruction the lifter could not express */
+    H2_STOP_UNRESOLVED,           /* control transfer to a guest address with no lifted body */
+    H2_STOP_UNIMPLEMENTED_IMPORT, /* called a Win32/DLL function the platform layer does not implement */
+    H2_STOP_BUDGET,               /* a test's dispatch budget ran out */
+    H2_STOP_FAULT,                /* host fault raised by guest code (bad guest pointer) */
+    H2_STOP_INTERNAL
+} h2_stop_reason;
+
+typedef void (*h2_stop_handler)(h2_stop_reason why, const char *message);
+void h2_set_stop_handler(h2_stop_handler fn);
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((noreturn, format(printf, 2, 3)))
+#endif
+void h2_guest_stop(h2_stop_reason why, const char *fmt, ...);
+
 #define H2_INFO(cat, ...)  h2_log((cat), H2_LVL_INFO,  __VA_ARGS__)
 #define H2_WARN(cat, ...)  h2_log((cat), H2_LVL_WARN,  __VA_ARGS__)
 #define H2_ERROR(cat, ...) h2_log((cat), H2_LVL_ERROR, __VA_ARGS__)

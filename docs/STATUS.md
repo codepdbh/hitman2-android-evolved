@@ -15,7 +15,7 @@ porque no existen el cargador, la capa Win32, el renderizador, el audio ni los c
 | 0 Preparación | **Probado** | Entorno inventariado, PCRecomp fijado, `WORK_SAFE_MODE` con autoprueba |
 | 1 Análisis de ejecutables | **Parcial** | Inventario PE, imports, catálogo de 21.336 funciones. Falta: DLL de render, vtables, grafo por subsistema, Ghidra |
 | 2 Recompilación de prueba | **Probado (x86-64 y ARM64)** | 98 funciones reales pasan la prueba diferencial; en ARM64 real los 544 vectores comparables son idénticos bit a bit al host |
-| 3 Runtime funcional | **Parcial** | Memoria invitada, registro de eventos y autoprueba hechos. `hitman2.exe` completo levantado y compilado para ARM64 (sin enlazar ni ejecutar). Falta: cargador PE, imports Win32, TIB/SEH, hilos, despacho global |
+| 3 Runtime funcional | **Probado (arranque), Parcial (conjunto)** | El programa recompilado completo se enlaza y **arranca desde su punto de entrada en PC y en ARM64 real**: CRT → `WinMain` → hasta el registro de la clase de ventana, con resultado idéntico en ambos. Hechos: cargador PE, despacho global, 73/151 imports, TIB, montón, handles, sistema de archivos. Falta: ventanas/mensajes, hilos, SEH/excepciones C++, carga de DLL del juego, registro |
 | 4 Primer render | Pendiente | Decisión de backend tomada con evidencia estática (`docs/RENDERER_DECISION.md`) |
 | 5 Carga de escenas | Pendiente | Solo reconocimiento del contenedor (ZIP sin cifrar, 13 tipos de fichero por escena) |
 | 6 Integración Android | **Parcial** | APK de diagnóstico compilado, instalado y ejecutado en el dispositivo. Sin superficie gráfica, entrada, audio ni importación de datos |
@@ -35,9 +35,9 @@ porque no existen el cargador, la capa Win32, el renderizador, el audio ni los c
 | 7 | Pipeline reproducible de PCRecomp | Parcial | `prepare_image` → `disasm32` → `lift_image` → `difftest_game`; solo `hitman2.exe`, falta `RenderOpenGL.dll` |
 | 8 | Primeras funciones recompiladas | Probado | imagen completa: 21.336 entradas levantadas, 0 excepciones; `docs/evidence/lift_census_2026-11-09.json` |
 | 9 | Pruebas diferenciales | Probado | `scripts/difftest_game.py`; `docs/evidence/difftest_2026-11-09_host_x64_and_arm64.json` |
-| 10 | Runtime inicial | Parcial | `runtime/guest_mem.*`, `h2_x87.h`, `h2_runtime.c`, `h2_log.h`, `h2_selftest.c` |
+| 10 | Runtime inicial | **Probado (arranque)** | `runtime/` (memoria, despacho, registro, parada controlada) + `platform/` (cargador PE, imports, montón, handles, archivos, KERNEL32); `docs/evidence/boot_probe_2026-11-09.txt` |
 | 11 | Adaptación de renderización | Pendiente | solo decisión documentada |
-| 12 | Ejecutable de prueba seguro para PC | Parcial | arnés y autoprueba de consola, sin ventana; no existe aún ejecutable con ventana |
+| 12 | Ejecutable de prueba seguro para PC | Probado (consola) | `pc_test/boot_probe.c` vía `scripts/boot_probe.py`: sin ventana, prioridad baja, con límite de tiempo y de llamadas. No existe aún ejecutable con ventana |
 | 13 | Proyecto Android compilable | **Compilado** | `android/` (Gradle 8.9, AGP 8.7.3, Kotlin 2.1.20, NDK 29, CMake 3.30.5) |
 | 14 | APK de prueba | **Probado** | `docs/evidence/android_selftest_2026-11-09.txt`: 22/22 en SM-S938B. **No es el juego**: no contiene código ni datos de Hitman 2 |
 | 15 | HUD táctil | Pendiente | |
@@ -51,8 +51,8 @@ porque no existen el cargador, la capa Win32, el renderizador, el audio ni los c
 |---|---|---|
 | A Analizar binarios | Parcial | `hitman2.exe` catalogado; DLL de render solo a nivel de imports/strings |
 | B Recompilar y validar funciones | **Probado** | 98/165 muestreadas PASS, 1 divergencia conocida, 66 inconclusas, 0 fallos sin explicar |
-| C Runtime portable | Parcial | memoria invitada sí; ejecución de un `WinMain` recompilado no |
-| D Dependencias Windows/render | Pendiente | superficie medida: 151 imports del exe, 64+19 funciones GL |
+| C Runtime portable | **Probado hasta `WinMain`** | 3.736 llamadas internas y 583 llamadas Win32 ejecutadas, idénticas en x86-64 y ARM64; se detiene en el primer import de ventanas |
+| D Dependencias Windows/render | Parcial | 73 de 151 imports del exe implementados (KERNEL32 de arranque, handles, archivos); USER32/GDI/DirectInput/DirectSound/registro y las 64+19 funciones GL, pendientes |
 | E Código nativo ARM64 | **Probado para la muestra, Compilado para la imagen completa** | muestra ejecutada en SM-S938B; las 72 unidades de `hitman2.exe` compilan (27 MB de objetos) pero no se han enlazado ni ejecutado |
 | F–J | Pendiente | |
 
@@ -72,6 +72,12 @@ porque no existen el cargador, la capa Win32, el renderizador, el audio ni los c
 - 505 instrucciones sin traducir (`RECOMP_TODO`) en 112 funciones. La mezcla (`pushal` 114, `out` 76, `in` 64, `das` 33, `xlatb` 33, `iretd` 20…) sugiere que la mayoría son datos catalogados como código, **sin verificar**. Si se alcanzan en ejecución, abortan con la dirección; no devuelven éxito.
 - 233 de 9.428 destinos de salto/llamada estáticos no tienen cuerpo levantado: huecos del catálogo por cerrar.
 - "Compila" es una afirmación sobre la traducción, no sobre la corrección.
+
+### Sonda de arranque
+- Qué es: el C levantado de `hitman2.exe` completo, enlazado con `runtime/` y `platform/`, ejecutado desde el punto de entrada original. El `.exe` del usuario se carga como datos en la memoria invitada.
+- Qué demuestra: que el código original recompilado inicializa su CRT, ejecuta sus inicializadores C++ y entra en `WinMain`, igual en x86-64 y en ARM64 real (mismo punto de parada, mismos contadores).
+- Qué no demuestra: nada más allá de ese punto. Se detiene en `USER32!GetClassInfoExA`: no hay ventana, mensajes, render, audio ni entrada. 3.736 llamadas es una fracción mínima del programa.
+- Cada parada nombra su causa (import sin implementar, instrucción sin traducir, destino sin cuerpo, fallo de memoria con dirección invitada). Ninguna función devuelve éxito sin hacer su trabajo.
 
 ### APK
 - Lo que demuestra: la cadena Gradle + NDK + JNI funciona, `libh2ae.so` carga en ARM64 y el runtime portable pasa sus 22 comprobaciones en el dispositivo.

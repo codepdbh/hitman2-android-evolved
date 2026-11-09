@@ -50,10 +50,31 @@ void h2_log(h2_log_cat cat, h2_log_lvl lvl, const char *fmt, ...)
     if (g_sink) g_sink(cat, lvl, line, g_sink_user);
 }
 
+/* ---- stopping the guest ----
+ * Anything the port cannot do correctly ends the guest here, with the reason.
+ * A host (the boot probe, the Android activity) may install a handler that
+ * unwinds to its own frame; the handler must not return. With none installed,
+ * or if it returns, the process aborts: continuing would run on wrong state. */
+static h2_stop_handler g_stop;
+
+void h2_set_stop_handler(h2_stop_handler fn) { g_stop = fn; }
+
+void h2_guest_stop(h2_stop_reason why, const char *fmt, ...)
+{
+    char msg[512];
+    va_list ap;
+    va_start(ap, fmt);
+    vsnprintf(msg, sizeof msg, fmt, ap);
+    va_end(ap);
+    h2_log(why == H2_STOP_EXIT ? H2_LOG_GAME : H2_LOG_ERROR,
+           why == H2_STOP_EXIT ? H2_LVL_INFO : H2_LVL_FATAL, "guest stopped: %s", msg);
+    if (g_stop) g_stop(why, msg);
+    abort();
+}
+
 /* An instruction the lifter could not translate was reached. This is never
  * survivable: the guest state after it would be wrong. Say exactly where. */
 void h2_todo(unsigned guest_va, const char *text)
 {
-    h2_log(H2_LOG_RECOMP, H2_LVL_FATAL, "untranslated instruction at guest %08X: %s", guest_va, text);
-    abort();
+    h2_guest_stop(H2_STOP_UNTRANSLATED, "untranslated instruction at guest %08X: %s", guest_va, text);
 }

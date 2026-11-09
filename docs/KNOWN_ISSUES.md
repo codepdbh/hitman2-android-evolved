@@ -35,6 +35,18 @@ Actualizado: 2026-11-09. Cada entrada dice cómo se detectó. Nada aquí está "
 
 Las correcciones 1, 2, 3 y 5 son candidatas a enviarse a PCRecomp.
 
+## Límites actuales de la capa de plataforma (`platform/`)
+
+- **Siguiente bloqueo del arranque**: clases de ventana, ventanas y cola de mensajes (`GetClassInfoExA`, `RegisterClassExA`, `CreateWindowExA`, `PeekMessageA`…). Hay que diseñarlos sobre una única superficie nativa en Android y sin ventana por defecto en el PC.
+- **Un solo hilo invitado.** `CreateThread` no existe; las secciones críticas y los mutex solo son correctos mientras sea así, y una espera infinita sobre un evento no señalado detiene al invitado con un mensaje en vez de colgarse.
+- **Sin SEH ni excepciones C++ del invitado.** El TIB simulado existe y los prólogos SEH funcionan, pero `RtlUnwind`, `RaiseException` y `UnhandledExceptionFilter` no están implementados: un `throw` del juego detendrá la ejecución nombrando el import.
+- **Sin carga de DLL del juego.** `LoadLibraryA` solo conoce los DLL de sistema; el renderizador (`RenderOpenGL.dll`) debe levantarse y mapearse como segunda imagen.
+- **Pila del host.** Las llamadas invitadas anidan en la pila nativa: la sonda usa 256 MiB. En la app Android el invitado deberá correr en un hilo propio con pila grande.
+- **Reloj en UTC**, sin zona horaria. **Código de página 1252** fijo. `LCMapString` solo convierte mayúsculas/minúsculas.
+- **Memoria**: `VirtualAlloc` no reutiliza el espacio liberado y el montón no fusiona bloques libres (solo reutiliza tamaños iguales). Suficiente para arrancar; habrá que medirlo con una escena cargada.
+- **Sistema de archivos sin estrenar**: `CreateFileA`/`ReadFile`/`WriteFile`/`SetFilePointer`/`GetFileSize` están implementados (raíz del juego de solo lectura + raíz de usuario con copia al escribir) pero el programa aún no los ha llamado; faltan `FindFirstFileA` y familia, borrado, renombrado y consultas de unidad.
+- Registro (`ADVAPI32`), `GDI32`, `DINPUT8`, `DSOUND`, `EAX`, `P5DLL`: sin implementar.
+
 ## Huecos medidos al levantar la imagen completa
 
 - 505 `RECOMP_TODO` en 112 funciones (detalle en `docs/evidence/lift_census_2026-11-09.json`). Pendiente clasificar cada función como "dato mal catalogado" o "código real con instrucción no soportada"; `pushal`/`popal`, `rdtsc`, `clc`/`stc`/`cmc` y `xlatb` son instrucciones reales que el lifter debería cubrir.
