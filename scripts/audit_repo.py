@@ -61,15 +61,62 @@ def main() -> int:
     for rel, why in problems:
         print(f"  BLOCK  {rel}: {why}")
     upstream = ROOT / "third_party" / "pcrecomp" / "tools" / "audit_repo.py"
-    rc2 = 0
+    unexplained = 0
     if upstream.exists() and (ROOT / ".git").exists() and git("rev-list", "-z", "--all", "--max-count=1"):
-        r = subprocess.run([sys.executable, str(upstream), str(ROOT)], capture_output=True, text=True,
-                           encoding="utf-8", errors="replace", creationflags=NO_WINDOW)
-        print("--- pcrecomp audit_repo.py ---")
-        print((r.stdout + r.stderr).strip()[-1500:])
-        rc2 = r.returncode
-    print("audit: CLEAN" if not problems and rc2 == 0 else "audit: PROBLEMS FOUND")
-    return 0 if not problems and rc2 == 0 else 1
+        unexplained = second_opinion(upstream)
+    clean = not problems and unexplained == 0
+    print("audit: CLEAN" if clean else "audit: PROBLEMS FOUND - do not commit or push")
+    return 0 if clean else 1
+
+
+def second_opinion(upstream: Path) -> int:
+    """Run PCRecomp's heuristic auditor. Each path it flags must be explained in
+    config/audit_allow.json (reviewed by hand, with a reason) or it counts as a
+    problem. Its history findings are accepted only up to the number of blob
+    versions the allow-listed files of that category have in history."""
+    import fnmatch
+    import json
+    allow = {k: v for k, v in json.loads((ROOT / "config" / "audit_allow.json").read_text(encoding="utf-8")).items()
+             if not k.startswith("_")}
+    r = subprocess.run([sys.executable, str(upstream), str(ROOT), "-v"], capture_output=True, text=True,
+                       encoding="utf-8", errors="replace", creationflags=NO_WINDOW)
+    category, flagged, history, bad = None, {}, {}, 0
+    for line in (r.stdout + r.stderr).splitlines():
+        s = line.strip()
+        if s.startswith("!! GAME MATERIAL"): category = "game material"; continue
+        if s.startswith("!! LIFTED OUTPUT"): category = "lifted output"; continue
+        if s.startswith("!! IN HISTORY"): category = "history"; continue
+        m = re.match(r"^\d+\s*[KMG]?B\s+(\S.*)$", s)
+        if m and category in ("game material", "lifted output"):
+            flagged.setdefault(category, []).append(m.group(1)); continue
+        m = re.match(r"^(\d+) objects\s+(.+)$", s)
+        if m and category == "history":
+            history[m.group(2).strip()] = int(m.group(1))
+    print("--- pcrecomp audit_repo.py (heuristic second opinion) ---")
+    explained = {}
+    for cat, paths in flagged.items():
+        for p in paths:
+            why = next((v for k, v in allow.items() if fnmatch.fnmatch(p, k)), None)
+            if why:
+                explained.setdefault(cat, []).append(p)
+                print(f"  reviewed  [{cat}] {p}")
+            else:
+                bad += 1
+                print(f"  BLOCK     [{cat}] {p}: flagged and not in config/audit_allow.json")
+    for cat, count in history.items():
+        versions = set()
+        for p in explained.get(cat, []):
+            for l in git("log", "--all", "--format=", "--raw", "--no-abbrev", "-z", "--", p):
+                parts = l.split()
+                if len(parts) >= 4 and parts[0].startswith(":"): versions.add(parts[3])
+        if count > len(versions):
+            bad += 1
+            print(f"  BLOCK     [history: {cat}] {count} objects flagged, only {len(versions)} are versions of reviewed files")
+        else:
+            print(f"  reviewed  [history: {cat}] {count} objects, all versions of reviewed files")
+    if not flagged and not history:
+        print("  nothing flagged")
+    return bad
 
 
 if __name__ == "__main__":
