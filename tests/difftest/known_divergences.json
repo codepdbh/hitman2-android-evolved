@@ -1,0 +1,4 @@
+{
+  "_comment": "Functions whose lifted behaviour is KNOWN to differ from x86, with the reason. They are reported as KNOWN_DIVERGENCE, never as PASS. Each must also appear in docs/KNOWN_ISSUES.md.",
+  "0x00454dc0": "fprem partial reduction. Hardware reduces the exponent by at most 63 bits per fprem and sets C2 for 'call again'; PCRecomp's fprem_op computes the full fmod and clears C2 (documented upstream design). This function executes a single fprem with no C2 loop, so it differs only when the operands' exponents are 64+ bits apart (test vector: random bit patterns as floats). KNOWN_ISSUES #4."
+}

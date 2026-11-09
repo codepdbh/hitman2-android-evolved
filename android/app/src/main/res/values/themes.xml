@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="h2_bg">#0B0B0C</color>
+    <color name="h2_panel">#17171A</color>
+    <color name="h2_red">#C8102E</color>
+    <color name="h2_text">#E8E8EA</color>
+    <color name="h2_dim">#8A8A90</color>
+
+    <style name="Theme.H2AE" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/h2_bg</item>
+        <item name="android:colorAccent">@color/h2_red</item>
+        <item name="android:textColorPrimary">@color/h2_text</item>
+        <item name="android:statusBarColor">@color/h2_bg</item>
+        <item name="android:navigationBarColor">@color/h2_bg</item>
+    </style>
+</resources>

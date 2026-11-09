@@ -1,0 +1,9 @@
+Hitman 2: Android Evolved - APK de diagnóstico 0.1-diagnostic (com.h2ae.android)
+Fecha: 2026-11-09 17:20   Dispositivo: SM-S938B (arm64-v8a, Android 17), serie (omitida)
+APK: android/app/build/outputs/apk/debug/app-debug.apk (1.300.927 bytes), Gradle 8.9 / AGP 8.7.3 / Kotlin 2.1.20 / NDK 29
+Orden: adb shell am start -n com.h2ae.android/.MainActivity --ez selftest true
+logcat -s H2AE:
+11-09 17:20:58.765 16722 16773 I H2AE    : ANDROID    I self-test requested from the app
+11-09 17:20:58.765 16722 16773 I H2AE    : RECOMP     I SELFTEST pass=22 fail=0 pointer_bits=64
+dumpsys package: primaryCpuAbi=arm64-v8a versionName=0.1-diagnostic
+Alcance: la autoprueba (runtime/h2_selftest.c) no contiene código del juego. Comprueba la memoria invitada y el modelo de CPU.

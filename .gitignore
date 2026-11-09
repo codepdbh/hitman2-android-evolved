@@ -1,0 +1,52 @@
+# --- Commercial game material: NEVER commit ---
+/Hitman 2 Silent Assassin/
+/game_data/
+*.exe
+*.dll
+*.ZIP
+*.zip
+*.WHD
+*.whd
+*.WAV
+*.wav
+*.gms
+*.tex
+*.prm
+*.anm
+*.loc
+
+# --- Derived from the original binaries: not redistributable ---
+/recomp/generated/
+/recomp/catalog/
+/analysis/raw/
+/analysis/private/
+
+# --- Third-party checkouts (fetched by scripts/bootstrap, pinned in config/dependencies.json) ---
+/third_party/pcrecomp/
+
+# --- Build / logs / temp ---
+/build/
+/logs/
+__pycache__/
+*.pyc
+.venv/
+.gradle/
+/android/build/
+/android/app/build/
+/android/app/.cxx/
+/android/local.properties
+*.apk
+*.aab
+*.keystore
+*.jks
+
+# --- IDE ---
+.vscode/
+.idea/
+*.iml
+
+# --- Android build state ---
+/android/.gradle/
+/android/.kotlin/
+/android/app/.cxx/
+/android/build/

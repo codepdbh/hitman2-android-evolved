@@ -1,0 +1,172 @@
+[
+ {
+  "module": "config.exe",
+  "kind": "exe",
+  "imports_local": [],
+  "imports_system": [
+   "ADVAPI32.dll",
+   "KERNEL32.dll",
+   "USER32.dll"
+  ],
+  "imported_by": [],
+  "export_count": 0,
+  "import_count": 63
+ },
+ {
+  "module": "eax.dll",
+  "kind": "dll",
+  "imports_local": [],
+  "imports_system": [
+   "ADVAPI32.dll",
+   "KERNEL32.dll",
+   "ole32.dll",
+   "USER32.dll"
+  ],
+  "imported_by": [
+   "hitman2.exe"
+  ],
+  "export_count": 7,
+  "import_count": 67
+ },
+ {
+  "module": "hitman2.exe",
+  "kind": "exe",
+  "imports_local": [
+   "EAX.DLL",
+   "P5DLL.dll"
+  ],
+  "imports_system": [
+   "ADVAPI32.dll",
+   "DINPUT8.dll",
+   "DSOUND.dll",
+   "GDI32.dll",
+   "KERNEL32.dll",
+   "USER32.dll"
+  ],
+  "imported_by": [
+   "RenderD3D.dll",
+   "RenderOpenGL.dll"
+  ],
+  "export_count": 677,
+  "import_count": 151
+ },
+ {
+  "module": "jpegdll.dll",
+  "kind": "dll",
+  "imports_local": [],
+  "imports_system": [
+   "KERNEL32.dll"
+  ],
+  "imported_by": [],
+  "export_count": 103,
+  "import_count": 58
+ },
+ {
+  "module": "Msvcp60.dll",
+  "kind": "dll",
+  "imports_local": [
+   "MSVCRT.dll"
+  ],
+  "imports_system": [
+   "KERNEL32.dll"
+  ],
+  "imported_by": [],
+  "export_count": 2104,
+  "import_count": 87
+ },
+ {
+  "module": "msvcrt.dll",
+  "kind": "dll",
+  "imports_local": [],
+  "imports_system": [
+   "KERNEL32.dll"
+  ],
+  "imported_by": [
+   "Msvcp60.dll"
+  ],
+  "export_count": 779,
+  "import_count": 140
+ },
+ {
+  "module": "p5dll.dll",
+  "kind": "dll",
+  "imports_local": [],
+  "imports_system": [
+   "HID.DLL",
+   "KERNEL32.dll",
+   "SETUPAPI.dll",
+   "USER32.dll"
+  ],
+  "imported_by": [
+   "hitman2.exe"
+  ],
+  "export_count": 21,
+  "import_count": 87
+ },
+ {
+  "module": "RenderD3D.dll",
+  "kind": "dll",
+  "imports_local": [
+   "hitman2.exe"
+  ],
+  "imports_system": [
+   "d3d8.dll",
+   "GDI32.dll",
+   "KERNEL32.dll",
+   "USER32.dll"
+  ],
+  "imported_by": [],
+  "export_count": 1,
+  "import_count": 113
+ },
+ {
+  "module": "RenderOpenGL.dll",
+  "kind": "dll",
+  "imports_local": [
+   "hitman2.exe"
+  ],
+  "imports_system": [
+   "GDI32.dll",
+   "KERNEL32.dll",
+   "OPENGL32.dll",
+   "USER32.dll"
+  ],
+  "imported_by": [],
+  "export_count": 1,
+  "import_count": 184
+ },
+ {
+  "module": "unins000.exe",
+  "kind": "exe",
+  "imports_local": [],
+  "imports_system": [
+   "advapi32.dll",
+   "comctl32.dll",
+   "comdlg32.dll",
+   "gdi32.dll",
+   "kernel32.dll",
+   "mpr.dll",
+   "msimg32.dll",
+   "ole32.dll",
+   "oleaut32.dll",
+   "shell32.dll",
+   "user32.dll",
+   "version.dll",
+   "winspool.drv"
+  ],
+  "imported_by": [],
+  "export_count": 0,
+  "import_count": 323
+ },
+ {
+  "module": "xmlparse.dll",
+  "kind": "dll",
+  "imports_local": [],
+  "imports_system": [
+   "KERNEL32.dll"
+  ],
+  "imported_by": [],
+  "export_count": 54,
+  "import_count": 37
+ }
+]

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Hitman 2 AE</string>
+    <string name="title">HITMAN 2 — ANDROID EVOLVED</string>
+    <string name="subtitle">Compilación de diagnóstico %1$s · no contiene el juego</string>
+    <string name="state">Estado: el runtime nativo arranca en este dispositivo. El juego todavía no se ejecuta: faltan el cargador, la capa Win32, el renderizador, el audio y los controles.</string>
+    <string name="btn_selftest">Autoprueba del runtime</string>
+    <string name="btn_import">Importar archivos del juego (pendiente)</string>
+    <string name="btn_start">Iniciar juego (pendiente)</string>
+    <string name="selftest_running">Ejecutando autoprueba nativa…</string>
+    <string name="selftest_ok">Autoprueba: %1$d comprobaciones correctas</string>
+    <string name="selftest_fail">Autoprueba: %1$d comprobaciones FALLIDAS</string>
+    <string name="native_missing">No se pudo cargar la biblioteca nativa: %1$s</string>
+</resources>
