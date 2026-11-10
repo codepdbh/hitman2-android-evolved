@@ -35,12 +35,34 @@ Actualizado: 2026-11-09. Cada entrada dice cómo se detectó. Nada aquí está "
 
 Las correcciones 1, 2, 3 y 5 son candidatas a enviarse a PCRecomp.
 
-## Límites actuales de la capa de plataforma (`platform/`)
+## Hallazgos de la sesión del 2026-11-10 (todos con evidencia)
 
-- **Siguiente bloqueo del arranque**: clases de ventana, ventanas y cola de mensajes (`GetClassInfoExA`, `RegisterClassExA`, `CreateWindowExA`, `PeekMessageA`…). Hay que diseñarlos sobre una única superficie nativa en Android y sin ventana por defecto en el PC.
+| # | Qué | Estado |
+|---|---|---|
+| L1 | El lifter de PCRecomp decodifica en lineal. Las rutinas del CRT escritas a mano (`memmove`) **incrustan tablas de saltos en el código**: los bytes de datos se decodifican como instrucciones, se pierde la alineación y los destinos de la tabla acaban como `dispatch` a direcciones sin cuerpo. | **Corregido** en `recomp/h2_lifter.py` (decodificación por flujo de control). Efecto medido: sitios sin traducir del exe 298 → 29; del renderizador 5 → 0. La prueba diferencial no cambió (98 PASS) |
+| L2 | Tablas de saltos con índice **negativo** (`jmp [ecx*4+base]`, ecx = −4…−1) o con la entrada 0 sin uso: el lifter las leía hacia delante y no encontraba brazos. | **Corregido** (heurística acotada a punteros dentro de la propia función). Es una heurística: una tabla que no encaje en ninguna de las tres formas seguiría sin resolverse y se vería como `unresolved-dispatch` |
+| P1 | **Fallo mío**: `USER32!EnumDisplaySettingsA` borraba 154 bytes sobre un `DEVMODEA` de 156 desde el offset 38, es decir, 36 bytes de más: pisó los registros guardados en la pila del invitado y el juego acabó con `esi=0` y un acceso a `0x00000BB7`. | **Corregido**. Encontrado con el vigilante de memoria por dispatch (`--watch-mem`). Revisadas el resto de escrituras en estructuras del invitado. Pendiente: una prueba que escriba cada estructura sobre un búfer con centinelas |
+| P2 | El rastreo de pila del propio diagnóstico leía 5 bytes antes de la base de una imagen y mataba el proceso. | **Corregido** |
+
+## Límites de la capa OpenGL (`renderer/`)
+
+- **Backend nulo**: cuenta lotes, vértices y texturas pero no dibuja; `glReadPixels` no devuelve nada (lo dice en el log) y deja la memoria del cliente intacta. No existe aún el backend GLES 3 ni una superficie.
+- **Se anuncia OpenGL 1.1** más `GL_ARB_multitexture` (2 unidades), `GL_EXT_texture_env_add`, `GL_EXT_blend_subtract`, `GL_EXT_bgra`, `GL_EXT_packed_pixels` y `GL_SGIS_texture_edge_clamp`: solo lo implementado. No se anuncian compresión S3TC, paletas, anisotropía ni NV vertex array range.
+- Texturas: tamaño potencia de dos (como GL 1.1; si no, error), RGBA8 en el backend; `GL_CLAMP` lo resuelve cada backend como `CLAMP_TO_EDGE` (diferencia visible en bordes).
+- No implementado y que **no** devuelve éxito: `glPolygonMode` ≠ relleno (aviso, se dibuja relleno), planos de recorte, `GL_TEXTURE_ENV_COLOR`, `GL_LIGHT_MODEL_TWO_SIDE/LOCAL_VIEWER` (aviso), `glPixelStorei` con salto o longitud de fila (detiene el invitado), segundo contexto GL.
+- `glTexGen` y la iluminación/niebla/combinadores se **almacenan** y se pasan al backend; el backend GLES deberá traducirlos a shaders. Nada de eso está verificado visualmente.
+- El gamma (`SetDeviceGammaRamp`) nunca llega al monitor real: es un posproceso del backend.
+
+## Límites de la capa de plataforma (`platform/`)
+
+- **Ventanas**: modelo sin bordes sobre una pantalla virtual 800×450; `ChangeDisplaySettings` solo admite el modo virtual; `SetForegroundWindow`/`SetFocus`/`SetCursorPos`/`ClipCursor` actúan solo en el mundo del invitado (nunca tocan el escritorio real). Mensajes no generados: `WM_PAINT`, `WM_GETMINMAXINFO`, `WM_WINDOWPOSCHANGED`, no cliente. `LoadIconA` no comprueba que el recurso exista.
+- **Bucle de mensajes**: `GetMessage`/`WaitMessage` sobre cola vacía detienen el invitado (no hay fuente de entrada que lo despierte). Hace falta el bucle del host (Android: un hilo + cola; PC: pruebas).
+- **Registro**: en memoria, vacío salvo lo sembrado; sin persistencia. Solo las 4 funciones que importa el exe.
+- **DirectInput 8**: teclado y ratón del sistema; sin mandos; formatos de datos personalizados detienen el invitado.
+- **DirectSound**: solo `DirectSoundEnumerateA` (un dispositivo virtual). El siguiente bloqueo es `EAXDirectSoundCreate8` (EAX.DLL#6, ordinal 6 de `eax.dll`): hace falta el modelo COM completo (IDirectSound8, buffers, 3D) y un backend de audio. `P5DLL` está respondido como "sin guante" (suposición documentada en `platform/game_dlls.c`).
 - **Un solo hilo invitado.** `CreateThread` no existe; las secciones críticas y los mutex solo son correctos mientras sea así, y una espera infinita sobre un evento no señalado detiene al invitado con un mensaje en vez de colgarse.
 - **Sin SEH ni excepciones C++ del invitado.** El TIB simulado existe y los prólogos SEH funcionan, pero `RtlUnwind`, `RaiseException` y `UnhandledExceptionFilter` no están implementados: un `throw` del juego detendrá la ejecución nombrando el import.
-- **Sin carga de DLL del juego.** `LoadLibraryA` solo conoce los DLL de sistema; el renderizador (`RenderOpenGL.dll`) debe levantarse y mapearse como segunda imagen.
+- **DLL del juego**: solo se carga lo que está levantado y enlazado (hoy `RenderOpenGL.dll`). Todas las imágenes deben caber en su base preferida sin solaparse (el exe en `0x400000`, el renderizador en `0x10000000`); un segundo DLL con la misma base (`xmlparse`, `jpegdll`, `eax` prefieren `0x10000000`) **no se puede cargar** sin reubicación. `FreeLibrary` ejecuta `DllMain(DETACH)` pero no libera la memoria.
 - **Pila del host.** Las llamadas invitadas anidan en la pila nativa: la sonda usa 256 MiB. En la app Android el invitado deberá correr en un hilo propio con pila grande.
 - **Reloj en UTC**, sin zona horaria. **Código de página 1252** fijo. `LCMapString` solo convierte mayúsculas/minúsculas.
 - **Memoria**: `VirtualAlloc` no reutiliza el espacio liberado y el montón no fusiona bloques libres (solo reutiliza tamaños iguales). Suficiente para arrancar; habrá que medirlo con una escena cargada.
@@ -49,8 +71,8 @@ Las correcciones 1, 2, 3 y 5 son candidatas a enviarse a PCRecomp.
 
 ## Huecos medidos al levantar la imagen completa
 
-- 505 `RECOMP_TODO` en 112 funciones (detalle en `docs/evidence/lift_census_2026-11-09.json`). Pendiente clasificar cada función como "dato mal catalogado" o "código real con instrucción no soportada"; `pushal`/`popal`, `rdtsc`, `clc`/`stc`/`cmc` y `xlatb` son instrucciones reales que el lifter debería cubrir.
-- 233 destinos estáticos de `dispatch` sin cuerpo levantado.
+- `hitman2.exe`: 29 `RECOMP_TODO` en 23 funciones (`int` 16, `fpu` 6, `x87` 5, `int1` 2; detalle en `docs/evidence/lift_census_hitman2_2026-11-10.json`). Pendiente clasificar cada una como datos mal catalogados o código real con instrucción no soportada. `pushal/popal`, `xlatb`, `clc/stc/cmc` y `rdtsc` ya se traducen (`rdtsc` como contador de 1 tick/ns, no la frecuencia real).
+- 195 destinos estáticos de `dispatch` sin cuerpo en el exe y 11 en el renderizador.
 - Las entradas del catálogo recortadas al inicio de la siguiente función terminan en un `dispatch` de continuación; correcto, pero cada una es una transferencia indirecta más en tiempo de ejecución.
 
 ## Limitaciones del análisis actual

@@ -49,6 +49,23 @@ uint32_t h2_import_bind(const char *dll, const char *name)
     return H2_THUNK_BASE + (g_nbound++) * H2_THUNK_STRIDE;
 }
 
+const char *h2_import_name_at(uint32_t va)
+{
+    static char buf[160];
+    if (va < H2_THUNK_BASE || (va - H2_THUNK_BASE) % H2_THUNK_STRIDE) return 0;
+    unsigned idx = (va - H2_THUNK_BASE) / H2_THUNK_STRIDE;
+    if (idx >= g_nbound) return 0;
+    snprintf(buf, sizeof buf, "%s!%s", g_bound[idx].dll, g_bound[idx].name);
+    return buf;
+}
+
+int h2_import_defined(const char *dll, const char *name)
+{
+    for (size_t k = 0; k < g_ndefs; k++)
+        if (ieq(g_defs[k]->dll, dll) && strcmp(g_defs[k]->name, name) == 0) return 1;
+    return 0;
+}
+
 int h2_import_dispatch(CPU *c, uint32_t va)
 {
     uint32_t args[16];

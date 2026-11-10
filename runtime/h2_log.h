@@ -36,6 +36,7 @@ typedef enum {
     H2_STOP_UNIMPLEMENTED_IMPORT, /* called a Win32/DLL function the platform layer does not implement */
     H2_STOP_BUDGET,               /* a test's dispatch budget ran out */
     H2_STOP_FAULT,                /* host fault raised by guest code (bad guest pointer) */
+    H2_STOP_REQUESTED,            /* the host ended the run on purpose (e.g. N frames presented) */
     H2_STOP_INTERNAL
 } h2_stop_reason;
 

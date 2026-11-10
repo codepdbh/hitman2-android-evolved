@@ -17,6 +17,12 @@ extern "C" {
 typedef int (*h2_import_hook)(CPU *c, uint32_t guest_va);
 void h2_dispatch_set_import_hook(h2_import_hook hook);
 
+/* Log registers and stack words each time `guest_va` is entered through the dispatcher (up to 8). */
+void h2_dispatch_watch(uint32_t guest_va);
+void h2_dispatch_set_name_resolver(const char *(*fn)(uint32_t guest_va));   /* names import thunks in diagnostics */
+void h2_dispatch_watch_mem(uint32_t guest_addr);         /* log each change of this dword, checked at every dispatch (up to 4) */
+void h2_dispatch_watch_ret(uint32_t return_address);      /* ... or whenever something is entered with this return address */
+
 /* Stop the guest (H2_STOP_BUDGET) after this many dispatches; 0 = unlimited. */
 void h2_dispatch_set_budget(uint64_t max_dispatches);
 uint64_t h2_dispatch_count(void);

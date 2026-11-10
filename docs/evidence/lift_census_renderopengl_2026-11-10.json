@@ -1,0 +1,50 @@
+{
+ "module": "renderopengl",
+ "date": "2026-11-10T10:37:48",
+ "seconds": 1.1,
+ "catalog_entries": 1706,
+ "lifted": 1706,
+ "lifter_exceptions": 0,
+ "lifter_exception_kinds": {},
+ "lifter_exception_addresses": [],
+ "c_lines": 122185,
+ "chunks": 6,
+ "functions_containing_RECOMP_TODO": 0,
+ "RECOMP_TODO_total": 0,
+ "RECOMP_TODO_by_mnemonic": {},
+ "static_dispatch_targets": 864,
+ "static_dispatch_targets_without_body": 11,
+ "static_dispatch_targets_without_body_sample": [
+  "0x1000179e",
+  "0x10001e03",
+  "0x10016c23",
+  "0x10019c9e",
+  "0x10019d2e",
+  "0x10024f03",
+  "0x10026e11",
+  "0x1002ffd1",
+  "0x1002fff3",
+  "0x10030013",
+  "0x100372f0"
+ ],
+ "compile": {
+  "host": {
+   "chunks": 6,
+   "ok": 6,
+   "failed": [],
+   "seconds": 6.3,
+   "object_bytes": 3918507,
+   "compiler": "C:\\Program Files\\LLVM\\bin\\clang.exe",
+   "flags": "-O1"
+  },
+  "arm64": {
+   "chunks": 6,
+   "ok": 6,
+   "failed": [],
+   "seconds": 14.5,
+   "object_bytes": 3068808,
+   "compiler": "<HOME>\\AppData\\Local\\Android\\Sdk\\ndk\\29.0.14206865\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\clang.exe",
+   "flags": "-O1"
+  }
+ }
+}

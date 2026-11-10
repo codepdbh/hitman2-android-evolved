@@ -47,6 +47,8 @@ void h2_imports_register(const H2ImportDef *defs, size_t count);
  * unimplemented import gets a thunk that stops the guest, naming it, if called. */
 uint32_t h2_import_bind(const char *dll, const char *name);
 int  h2_import_dispatch(CPU *c, uint32_t guest_va);        /* the dispatcher's import hook */
+int  h2_import_defined(const char *dll, const char *name); /* is there a native implementation? (creates no thunk) */
+const char *h2_import_name_at(uint32_t guest_va);          /* "DLL!Name" of a thunk address, or NULL (valid until the next call) */
 void h2_imports_stats(unsigned *bound, unsigned *implemented);
 /* Call counts per bound import, for the boot report. Returns entries written. */
 typedef struct { const char *dll, *name; int implemented; uint64_t calls; } H2ImportStat;
@@ -56,13 +58,28 @@ extern int g_h2_trace_imports;
 
 /* ---- PE loader ---- */
 typedef struct {
-    uint32_t base, size, entry;
+    uint32_t base, size, entry;            /* entry == 0 if the image has none */
+    uint32_t export_rva, export_size;
     unsigned sections, import_slots;
+    int      is_dll;
+    char     name[40];                     /* file name, e.g. "hitman2.exe" */
     char     path[260];
 } H2Image;
 /* Map a PE32 i386 image from a host file into guest memory at its preferred
- * base and bind its imports. Returns 0, or -1 with a logged reason. */
+ * base and bind its imports. Returns 0, or -1 with a logged reason. The
+ * lifted code of the module must already be linked in (it is addressed by
+ * guest VA). A DLL's entry point is NOT run here; LoadLibrary does that. */
 int h2_pe_load(const char *host_path, H2Image *img);
+
+/* Loaded-image registry. Pointers stay valid for the life of the process. */
+const H2Image *h2_image_by_name(const char *name);         /* case-insensitive, directory part ignored */
+const H2Image *h2_image_by_handle(uint32_t base);          /* HMODULE == image base */
+int      h2_image_contains(uint32_t addr, uint32_t size);  /* [addr, addr+size) lies inside one loaded image */
+uint32_t h2_image_export(const H2Image *img, const char *name_or_ordinal);   /* guest VA, or 0; ordinals as "#n" */
+
+/* Resolve a guest path to a host file for reading (user root first, then the
+ * read-only game install). 0 on success. */
+int h2_files_resolve_read(const char *guest_path, char *host, size_t cap);
 
 /* ---- guest memory services ---- */
 uint32_t h2_virtual_alloc(uint32_t size);                  /* page-granular, zeroed; 0 on failure */
@@ -86,7 +103,20 @@ extern uint32_t g_h2_last_error;                           /* GetLastError value
 /* Host directories behind the guest's C:\Hitman2: the read-only game install
  * and the writable user root (created if missing). Call before running. */
 void h2_files_configure(const char *game_root, const char *user_root);
+/* ---- virtual display, input and the message queue (win32_user32.c) ---- */
+void h2_display_configure(int width, int height);           /* what GetSystemMetrics reports; default 800x450 */
+void h2_display_size(int *width, int *height);
+int  h2_post_message(uint32_t hwnd, uint32_t msg, uint32_t wparam, uint32_t lparam);
+uint32_t h2_main_window(void);                              /* the active guest window, or 0 */
+/* Call a guest stdcall function with up to 8 uint32_t arguments. */
+uint32_t h2_call_guest(CPU *c, uint32_t fn, int nargs, ...);
 void h2_register_user32(void);
+void h2_register_game_dlls(void);
+void h2_register_advapi32(void);                           /* registry: in-memory, empty unless seeded */
+int  h2_registry_set_string(const char *path, const char *name, const char *value);   /* path like "HKLM\\Software\\X" */
+int  h2_registry_set_dword(const char *path, const char *name, uint32_t value);
+void h2_register_dsound(void);                              /* DirectSound: device enumeration only, so far */
+void h2_register_dinput8(void);                           /* DirectInput 8 over input/input_manager.h */
 void h2_register_objects(void);
 void h2_register_files(void);
 void h2_register_kernel32(void);

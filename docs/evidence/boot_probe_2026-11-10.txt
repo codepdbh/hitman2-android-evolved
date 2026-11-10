@@ -1,0 +1,160 @@
+﻿Hitman 2: Android Evolved - sonda de arranque, 2026-11-10 (scripts/boot_probe.py --calls --android <serie>)
+Programa: hitman2.exe 1.0.0.265 + RenderOpenGL.dll (lifted completos) + runtime + platform + renderer (capa OpenGL, backend nulo sin ventana).
+Configuracion: el perfil del puerto en la raiz de usuario (DrawDll RenderOpenGL.dll, Window 1, Resolution 800x450); la instalacion se abre en solo lectura.
+Consola, sin ventana. Los ficheros del usuario se cargan como datos; el codigo que se ejecuta es el C levantado.
+
+ARM64 real (SM-S938B, arm64-v8a, Android 17, binario de consola en /data/local/tmp, borrado al terminar):
+  RESULT reason=unimplemented-import dispatches=104926 imports_called=109 import_calls=8554 implemented=116 bound=151
+  -> mismo punto de parada y mismos contadores que el host x86-64: SI
+
+Salida del host x86-64 a continuacion.
+=====================================================================================================FILESYSTEM I guest C:\Hitman2 = [user] <HOME>\Documents\H2-AndroidEvolved\build\boot\user + [game, read-only] <HOME>\Documents\H2-AndroidEvolved\Hitman 2 Silent Assassin
+FILESYSTEM I loaded hitman2.exe base=00400000 size=00366000 entry=0059F54E sections=7 import slots=151
+image <HOME>\Documents\H2-AndroidEvolved\Hitman 2 Silent Assassin\hitman2.exe: base=00400000 entry=0059F54E, 151 distinct imports bound, 116 implemented
+lifted functions linked: 23042; entry has a lifted body: yes
+WIN32      I GetProcAddress(kernel32.dll, "IsProcessorFeaturePresent")
+WIN32      I RegisterClassEx "ZSYSTEMCLASS  0" wndproc=00418030
+WIN32      I CreateWindowEx class="ZSYSTEMCLASS  0" title="" 640x480 at (80,-15) style=86000000 -> hwnd 10100
+INPUT      I DirectInput 8 created (version 0800)
+INPUT      I DirectInput device created: mouse
+INPUT      I DirectInput device created: keyboard
+WIN32      I window title: ""
+FILESYSTEM I open "hitman2.ini" (read, user root) -> handle 104
+WIN32      I RegOpenKeyEx HKLM\SOFTWARE\EIDOS INTERACTIVE -> not found
+FILESYSTEM I open "writetest" (write, user root) -> handle 104
+FILESYSTEM I deleted "writetest" (user root)
+WIN32      I window title: ""
+FILESYSTEM I open "hitman2.ini" (read, user root) -> handle 104
+FILESYSTEM I open "hitman2.ini" (read, user root) -> handle 104
+FILESYSTEM I loaded RenderOpenGL.dll base=10000000 size=0013B000 entry=100336B6 sections=4 import slots=184 (DLL)
+WIN32      I LoadLibraryA("RenderOpenGL.dll") -> DllMain(10000000, DLL_PROCESS_ATTACH)
+WIN32      I GetProcAddress(kernel32.dll, "IsProcessorFeaturePresent")
+WIN32      I GetProcAddress(RenderOpenGL.dll, "Create") -> 10001000
+WIN32      I window title: "Hitman2"
+GRAPHICS   I pixel format 1: 32-bit colour, 24-bit depth, 8-bit stencil
+GRAPHICS   I GL context current, backend 'null (headless)', surface 800x450
+GRAPHICS   I wglGetProcAddress("glActiveTextureARB")
+GRAPHICS   I wglGetProcAddress("glClientActiveTextureARB")
+GRAPHICS   I wglGetProcAddress("glMultiTexCoord2fvARB")
+GRAPHICS   I wglGetProcAddress("glMultiTexCoord4fvARB")
+GRAPHICS   I wglGetProcAddress("glBlendEquationEXT")
+AUDIO      I DirectSoundEnumerateA: offering the virtual output device
+ERROR      F guest stopped: EAX.DLL!#6 is not implemented (called from guest 005EE980)
+
+stopped: unimplemented-import
+  EAX.DLL!#6 is not implemented (called from guest 005EE980)
+  cpu: eax=00000000 ecx=207DF970 edx=00658A90 ebx=207DF970 esp=0FEFE574 ebp=006C3660 esi=207E9BE4 edi=207DF970
+  esp=0FEFE574 (inside the guest stack)  guest stack, probable return addresses (nearest first): 005EE980 005B51EF 005B50E9 004199E6 004199AC 005EE73B 0041A694 0041A98C 005C79E7 005C7C1F 005B51EF 005B50E9 005C7C1F 005B5664 00419C62 005C79E7 005C79E7 005C807F 005C7C1F 005B5664
+  last dispatch targets (oldest first): 005EE71F 005EE710 005EE71F 005EE710 005EE71F 005EE710 005EE71F 005EE710 005EE71F 005EE710 005EE71F 005EE950 006141B0 FE000960(DSOUND.dll!#2) 005EE210 FE000950(EAX.DLL!#6)
+  GL: frames=0 draw_calls=0 triangles=0 clears=1 tex_uploads=2 (66560 bytes) textures_live=2 gl_errors=0
+  imports called: 109 distinct, 8554 calls
+           2  KERNEL32.dll!HeapFree
+           1  KERNEL32.dll!ReadFile
+           1  KERNEL32.dll!LoadLibraryA
+          18  KERNEL32.dll!HeapAlloc
+           1  KERNEL32.dll!GetFileSize
+           1  KERNEL32.dll!DeleteFileA
+           1  KERNEL32.dll!WriteFile
+           3  KERNEL32.dll!GetProcAddress
+           4  KERNEL32.dll!GetSystemTimeAsFileTime
+           4  KERNEL32.dll!QueryPerformanceCounter
+           1  KERNEL32.dll!QueryPerformanceFrequency
+           1  KERNEL32.dll!InitializeCriticalSection
+        3893  KERNEL32.dll!LeaveCriticalSection
+        3893  KERNEL32.dll!EnterCriticalSection
+           3  KERNEL32.dll!GetModuleHandleA
+           3  KERNEL32.dll!GetStartupInfoA
+           2  KERNEL32.dll!GetCommandLineA
+           2  KERNEL32.dll!GetVersion
+           2  KERNEL32.dll!GetVersionExA
+           2  KERNEL32.dll!HeapCreate
+          78  KERNEL32.dll!HeapReAlloc
+           2  KERNEL32.dll!SetHandleCount
+           6  KERNEL32.dll!GetStdHandle
+           6  KERNEL32.dll!GetFileType
+         421  KERNEL32.dll!HeapSize
+           2  KERNEL32.dll!FreeEnvironmentStringsW
+           8  KERNEL32.dll!WideCharToMultiByte
+           2  KERNEL32.dll!SetErrorMode
+           2  KERNEL32.dll!GetEnvironmentStringsW
+           2  KERNEL32.dll!SetUnhandledExceptionFilter
+          12  KERNEL32.dll!MultiByteToWideChar
+           4  KERNEL32.dll!GetStringTypeW
+           4  KERNEL32.dll!GetCPInfo
+           2  KERNEL32.dll!GetACP
+          10  KERNEL32.dll!LCMapStringW
+           1  KERNEL32.dll!CreateMutexA
+           1  KERNEL32.dll!GetLastError
+           5  KERNEL32.dll!GetModuleFileNameA
+           4  KERNEL32.dll!CreateFileA
+           6  KERNEL32.dll!CloseHandle
+           1  DINPUT8.dll!DirectInput8Create
+           2  ADVAPI32.dll!RegOpenKeyExA
+           1  GDI32.dll!GetStockObject
+           3  USER32.dll!SetWindowTextA
+           3  USER32.dll!SetWindowLongA
+           1  USER32.dll!LoadCursorA
+           6  USER32.dll!GetSystemMetrics
+           2  USER32.dll!GetClassInfoExA
+           1  USER32.dll!FindWindowA
+           1  USER32.dll!ShowWindow
+           3  USER32.dll!SystemParametersInfoA
+           1  USER32.dll!PostMessageA
+           1  USER32.dll!CreateWindowExA
+           1  USER32.dll!RegisterClassExA
+          10  USER32.dll!DefWindowProcA
+           1  USER32.dll!PeekMessageA
+           1  USER32.dll!RegisterWindowMessageA
+           1  P5DLL.dll!??0CP5DLL@@QAE@XZ
+           1  EAX.DLL!#6   <-- NOT IMPLEMENTED
+           1  DSOUND.dll!#2
+           2  kernel32.dll!IsProcessorFeaturePresent
+           2  DINPUT8.dll#IDirectInput8A!CreateDevice
+           1  DINPUT8.dll#IDirectInput8A!EnumDevices
+           1  DINPUT8.dll#IDirectInputDevice8!SetProperty
+           3  DINPUT8.dll#IDirectInputDevice8!Acquire
+           2  DINPUT8.dll#IDirectInputDevice8!SetDataFormat
+           2  DINPUT8.dll#IDirectInputDevice8!SetCooperativeLevel
+           1  USER32.dll!ReleaseDC
+           1  USER32.dll!EnumDisplaySettingsA
+           5  USER32.dll!GetClientRect
+           1  USER32.dll!GetWindowDC
+           1  USER32.dll!GetDC
+           1  USER32.dll!GetDesktopWindow
+           1  USER32.dll!GetCursor
+           1  USER32.dll!SetCursorPos
+           6  USER32.dll!ClientToScreen
+           2  USER32.dll!SetCursor
+           2  USER32.dll!SetFocus
+           1  USER32.dll!GetWindowRect
+           1  USER32.dll!AdjustWindowRectEx
+           3  USER32.dll!ClipCursor
+           1  USER32.dll!SetForegroundWindow
+           1  USER32.dll!MoveWindow
+           1  GDI32.dll!GetPixelFormat
+           1  GDI32.dll!SetPixelFormat
+           7  GDI32.dll!DescribePixelFormat
+           2  GDI32.dll!GetDeviceCaps
+           2  OPENGL32.dll!glTexImage2D
+           2  OPENGL32.dll!glGenTextures
+           1  OPENGL32.dll!glClearColor
+           1  OPENGL32.dll!glClear
+           2  OPENGL32.dll!glPixelStorei
+           1  OPENGL32.dll!wglCreateContext
+           1  OPENGL32.dll!wglMakeCurrent
+           1  OPENGL32.dll!glShadeModel
+           1  OPENGL32.dll!glDrawBuffer
+           1  OPENGL32.dll!glCullFace
+           1  OPENGL32.dll!glFogi
+           2  OPENGL32.dll!glMatrixMode
+           2  OPENGL32.dll!glLoadIdentity
+           1  OPENGL32.dll!glEnable
+           1  OPENGL32.dll!glDisable
+           2  OPENGL32.dll!glBindTexture
+           4  OPENGL32.dll!glTexParameteri
+           5  OPENGL32.dll!wglGetProcAddress
+           1  OPENGL32.dll!glGetIntegerv
+           9  OPENGL32.dll!glGetString
+           1  KERNEL32.dll!DisableThreadLibraryCalls
+           1  OPENGL32.dll!glActiveTextureARB
+RESULT reason=unimplemented-import dispatches=104926 imports_called=109 import_calls=8554 implemented=116 bound=151

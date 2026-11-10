@@ -1,0 +1,1811 @@
+{
+ "date": "2026-11-10T10:51:23",
+ "binary_sha256_of_original": "0d7742c85e328886e91152036ae6615ca4c98bbb97c7a36d8f9e150235e57560",
+ "pcrecomp_lifter": "tools/lift/lift32_cpu.py",
+ "host": "x86_64 (clang), guest memory via runtime/guest_mem (4 GiB reservation)",
+ "arm64_v8a_harness_compiled": true,
+ "arm64_v8a_harness_executed": true,
+ "arm64_v8a": {
+  "device": {
+   "serial": "(omitida)",
+   "model": "SM-S938B",
+   "abi": "arm64-v8a",
+   "android": "17"
+  },
+  "vector_verdicts": {
+   "PASS": 539,
+   "FAIL": 1,
+   "INCONCLUSIVE": 4
+  },
+  "vectors_compared_with_host": 544,
+  "vectors_bit_identical_to_host": 544,
+  "functions_with_a_failing_vector": [
+   "0x00454dc0"
+  ]
+ },
+ "seed": 1,
+ "vectors_per_function": 8,
+ "testable_pool_by_kind": {
+  "calls": 4779,
+  "integer": 6501,
+  "string": 64,
+  "x87": 432,
+  "switch": 170
+ },
+ "selection_rejects": {
+  "indirect call/jmp": 6283,
+  "size/thunk": 1345,
+  "fs/gs (TIB) access": 1679,
+  "system insn": 50,
+  "does not decode linearly": 33,
+  "call closure leaves testable set": 85
+ },
+ "functions_tested": 165,
+ "functions_lifted_incl_callees": 206,
+ "function_verdicts": {
+  "PASS": 98,
+  "INCONCLUSIVE": 66,
+  "KNOWN_DIVERGENCE": 1
+ },
+ "by_kind": {
+  "integer": {
+   "PASS": 31,
+   "INCONCLUSIVE": 9
+  },
+  "x87": {
+   "INCONCLUSIVE": 17,
+   "PASS": 22,
+   "KNOWN_DIVERGENCE": 1
+  },
+  "string": {
+   "INCONCLUSIVE": 13,
+   "PASS": 27
+  },
+  "switch": {
+   "PASS": 13,
+   "INCONCLUSIVE": 21
+  },
+  "calls": {
+   "PASS": 5,
+   "INCONCLUSIVE": 6
+  }
+ },
+ "vector_verdicts": {
+  "PASS": 539,
+  "INCONCLUSIVE": 780,
+  "FAIL": 1
+ },
+ "pass_vectors_with_flag_differences": 20,
+ "functions": [
+  {
+   "address": "0x00401580",
+   "kind": "integer",
+   "size": 13,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 8
+   },
+   "export": "?SetOnlyEventUpdate@ZEngineDataBase@@QAEXPAVZEventBase@@@Z"
+  },
+  {
+   "address": "0x00401590",
+   "kind": "integer",
+   "size": 7,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 8
+   },
+   "export": "?GetOnlyEventUpdate@ZEngineDataBase@@QAEPAVZEventBase@@XZ"
+  },
+  {
+   "address": "0x004015a0",
+   "kind": "integer",
+   "size": 7,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 8
+   },
+   "export": "?GetEngineGeomControl@ZEngineDataBase@@QAEPAVZEngineGeomControl@@XZ"
+  },
+  {
+   "address": "0x004015b0",
+   "kind": "integer",
+   "size": 7,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 8
+   },
+   "export": "?SceneChangeUpdate@ZEngineDataBase@@QBE_NXZ"
+  },
+  {
+   "address": "0x004015c0",
+   "kind": "integer",
+   "size": 7,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 8
+   },
+   "export": "?IsPaused@ZEngineDataBase@@QAE_NXZ"
+  },
+  {
+   "address": "0x004015d0",
+   "kind": "integer",
+   "size": 7,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 8
+   },
+   "export": "?IsPureWorldFile@ZEngineDataBase@@QAE_NXZ"
+  },
+  {
+   "address": "0x004015e0",
+   "kind": "integer",
+   "size": 43,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 3,
+    "INCONCLUSIVE": 5
+   },
+   "export": "?CheckInPackBuffer@ZEngineDataBase@@QAE_NPBX@Z"
+  },
+  {
+   "address": "0x00401610",
+   "kind": "integer",
+   "size": 40,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 7,
+    "INCONCLUSIVE": 1
+   },
+   "export": "?CheckInAnimBuffer@ZEngineDataBase@@QAE_NPBX@Z"
+  },
+  {
+   "address": "0x00401640",
+   "kind": "integer",
+   "size": 13,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 8
+   },
+   "export": "?SetPackTime@ZEngineDataBase@@QAEX_N@Z"
+  },
+  {
+   "address": "0x00401650",
+   "kind": "integer",
+   "size": 7,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 8
+   },
+   "export": "?GetPackTime@ZEngineDataBase@@QAE_NXZ"
+  },
+  {
+   "address": "0x00401660",
+   "kind": "integer",
+   "size": 7,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 8
+   },
+   "export": "?GetListUser@ZEngineDataBase@@QAEPAVCListUser@@XZ"
+  },
+  {
+   "address": "0x00406c80",
+   "kind": "integer",
+   "size": 63,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 4,
+    "INCONCLUSIVE": 4
+   },
+   "export": "??0ZSaveGame@@QAE@ABV0@@Z"
+  },
+  {
+   "address": "0x00406cc0",
+   "kind": "integer",
+   "size": 74,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "INCONCLUSIVE": 6,
+    "PASS": 2
+   },
+   "export": "??4ZSaveGame@@QAEAAV0@ABV0@@Z"
+  },
+  {
+   "address": "0x00406d70",
+   "kind": "integer",
+   "size": 63,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 2,
+    "INCONCLUSIVE": 6
+   },
+   "export": "??0ZLoadGame@@QAE@ABV0@@Z"
+  },
+  {
+   "address": "0x00406db0",
+   "kind": "integer",
+   "size": 77,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 4,
+    "INCONCLUSIVE": 4
+   },
+   "export": "??4ZLoadGame@@QAEAAV0@ABV0@@Z"
+  },
+  {
+   "address": "0x0041b170",
+   "kind": "integer",
+   "size": 7,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 8
+   },
+   "export": "?GetStaticBuffer@ZEngineDataBase@@QAEPADXZ"
+  },
+  {
+   "address": "0x0041b190",
+   "kind": "integer",
+   "size": 71,
+   "closure": 1,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   },
+   "export": "?NewEventClass@ZEngineDataBase@@QAEXPAVZEventBase@@@Z"
+  },
+  {
+   "address": "0x0041bb80",
+   "kind": "integer",
+   "size": 7,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 8
+   },
+   "export": "?IsLoading@ZEngineDataBase@@QAE_NXZ"
+  },
+  {
+   "address": "0x0041bd60",
+   "kind": "integer",
+   "size": 7,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 8
+   },
+   "export": "?LockMinMax@ZEngineDataBase@@QAEXXZ"
+  },
+  {
+   "address": "0x0041bd70",
+   "kind": "integer",
+   "size": 7,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 8
+   },
+   "export": "?UnlockMinMax@ZEngineDataBase@@QAEXXZ"
+  },
+  {
+   "address": "0x00401aa0",
+   "kind": "integer",
+   "size": 16,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "INCONCLUSIVE": 4,
+    "PASS": 4
+   }
+  },
+  {
+   "address": "0x0043cdb0",
+   "kind": "integer",
+   "size": 59,
+   "closure": 1,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x004584d0",
+   "kind": "integer",
+   "size": 31,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "INCONCLUSIVE": 5,
+    "PASS": 3
+   }
+  },
+  {
+   "address": "0x004726d0",
+   "kind": "integer",
+   "size": 7,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 8
+   }
+  },
+  {
+   "address": "0x00494320",
+   "kind": "integer",
+   "size": 6,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 8
+   }
+  },
+  {
+   "address": "0x004bd220",
+   "kind": "integer",
+   "size": 10,
+   "closure": 1,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x004f2fd0",
+   "kind": "integer",
+   "size": 134,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 8
+   }
+  },
+  {
+   "address": "0x0051d210",
+   "kind": "integer",
+   "size": 37,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 8
+   }
+  },
+  {
+   "address": "0x005480e0",
+   "kind": "integer",
+   "size": 10,
+   "closure": 1,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x00585200",
+   "kind": "integer",
+   "size": 6,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 8
+   }
+  },
+  {
+   "address": "0x005a515d",
+   "kind": "integer",
+   "size": 38,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 8
+   }
+  },
+  {
+   "address": "0x005b5aa0",
+   "kind": "integer",
+   "size": 93,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 8
+   }
+  },
+  {
+   "address": "0x005d02b0",
+   "kind": "integer",
+   "size": 7,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 8
+   }
+  },
+  {
+   "address": "0x005e7989",
+   "kind": "integer",
+   "size": 23,
+   "closure": 1,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x005fcd00",
+   "kind": "integer",
+   "size": 72,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 3,
+    "INCONCLUSIVE": 5
+   }
+  },
+  {
+   "address": "0x00614cc0",
+   "kind": "integer",
+   "size": 30,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 8
+   }
+  },
+  {
+   "address": "0x0062b570",
+   "kind": "integer",
+   "size": 11,
+   "closure": 1,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x0062c1b0",
+   "kind": "integer",
+   "size": 11,
+   "closure": 1,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x00630280",
+   "kind": "integer",
+   "size": 8,
+   "closure": 2,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x00632870",
+   "kind": "integer",
+   "size": 8,
+   "closure": 1,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x004d5ce0",
+   "kind": "x87",
+   "size": 21,
+   "closure": 1,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   },
+   "export": "?SetParticleMass@ConstrainedParticleSystem@@QAEXHM@Z"
+  },
+  {
+   "address": "0x004dc270",
+   "kind": "x87",
+   "size": 104,
+   "closure": 1,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   },
+   "export": "?TranslateParticlePosAndOld@ConstrainedParticleSystem@@QAEXHPAM@Z"
+  },
+  {
+   "address": "0x004dd9e0",
+   "kind": "x87",
+   "size": 120,
+   "closure": 1,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   },
+   "export": "?GetDistance@ConstrainedParticleSystem@@AAEMHH@Z"
+  },
+  {
+   "address": "0x004dda60",
+   "kind": "x87",
+   "size": 116,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "INCONCLUSIVE": 7,
+    "PASS": 1
+   },
+   "export": "?TranslateAllPosAndOld@ConstrainedParticleSystem@@QAEXPAM@Z"
+  },
+  {
+   "address": "0x00404770",
+   "kind": "x87",
+   "size": 15,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 8
+   }
+  },
+  {
+   "address": "0x00411530",
+   "kind": "x87",
+   "size": 48,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 1,
+    "INCONCLUSIVE": 7
+   }
+  },
+  {
+   "address": "0x00412987",
+   "kind": "x87",
+   "size": 470,
+   "closure": 1,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x0042dcb0",
+   "kind": "x87",
+   "size": 94,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "INCONCLUSIVE": 6,
+    "PASS": 2
+   }
+  },
+  {
+   "address": "0x00433d10",
+   "kind": "x87",
+   "size": 174,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "INCONCLUSIVE": 7,
+    "PASS": 1
+   }
+  },
+  {
+   "address": "0x0043c640",
+   "kind": "x87",
+   "size": 66,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "INCONCLUSIVE": 5,
+    "PASS": 3
+   }
+  },
+  {
+   "address": "0x0044d1d0",
+   "kind": "x87",
+   "size": 33,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 8
+   }
+  },
+  {
+   "address": "0x00454dc0",
+   "kind": "x87",
+   "size": 15,
+   "closure": 1,
+   "verdict": "KNOWN_DIVERGENCE",
+   "vectors": {
+    "PASS": 7,
+    "FAIL": 1
+   },
+   "known_divergence": "fprem partial reduction. Hardware reduces the exponent by at most 63 bits per fprem and sets C2 for 'call again'; PCRecomp's fprem_op computes the full fmod and clears C2 (documented upstream design). This function executes a single fprem with no C2 loop, so it differs only when the operands' exponents are 64+ bits apart (test vector: random bit patterns as floats). KNOWN_ISSUES #4."
+  },
+  {
+   "address": "0x00457ea2",
+   "kind": "x87",
+   "size": 392,
+   "closure": 1,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x00463043",
+   "kind": "x87",
+   "size": 20,
+   "closure": 1,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x0046c1f3",
+   "kind": "x87",
+   "size": 44,
+   "closure": 1,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x00474d90",
+   "kind": "x87",
+   "size": 107,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "INCONCLUSIVE": 6,
+    "PASS": 2
+   }
+  },
+  {
+   "address": "0x0047b360",
+   "kind": "x87",
+   "size": 23,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "INCONCLUSIVE": 5,
+    "PASS": 3
+   }
+  },
+  {
+   "address": "0x004a10a0",
+   "kind": "x87",
+   "size": 314,
+   "closure": 2,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x004c0270",
+   "kind": "x87",
+   "size": 34,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 8
+   }
+  },
+  {
+   "address": "0x004eb090",
+   "kind": "x87",
+   "size": 124,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 8
+   }
+  },
+  {
+   "address": "0x005003b0",
+   "kind": "x87",
+   "size": 33,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 8
+   }
+  },
+  {
+   "address": "0x00529aa0",
+   "kind": "x87",
+   "size": 477,
+   "closure": 1,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x0054e010",
+   "kind": "x87",
+   "size": 19,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 8
+   }
+  },
+  {
+   "address": "0x00560340",
+   "kind": "x87",
+   "size": 144,
+   "closure": 1,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x00592ff0",
+   "kind": "x87",
+   "size": 114,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 5,
+    "INCONCLUSIVE": 3
+   }
+  },
+  {
+   "address": "0x00594b70",
+   "kind": "x87",
+   "size": 7,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 8
+   }
+  },
+  {
+   "address": "0x00599220",
+   "kind": "x87",
+   "size": 134,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "INCONCLUSIVE": 5,
+    "PASS": 3
+   }
+  },
+  {
+   "address": "0x005a4772",
+   "kind": "x87",
+   "size": 43,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "INCONCLUSIVE": 2,
+    "PASS": 6
+   }
+  },
+  {
+   "address": "0x005a5320",
+   "kind": "x87",
+   "size": 11,
+   "closure": 1,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x005a552e",
+   "kind": "x87",
+   "size": 67,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "INCONCLUSIVE": 2,
+    "PASS": 6
+   }
+  },
+  {
+   "address": "0x005a801c",
+   "kind": "x87",
+   "size": 6,
+   "closure": 1,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x005b8b60",
+   "kind": "x87",
+   "size": 101,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "INCONCLUSIVE": 5,
+    "PASS": 3
+   }
+  },
+  {
+   "address": "0x005bd4d0",
+   "kind": "x87",
+   "size": 341,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "INCONCLUSIVE": 6,
+    "PASS": 2
+   }
+  },
+  {
+   "address": "0x005beb90",
+   "kind": "x87",
+   "size": 32,
+   "closure": 1,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x005c1200",
+   "kind": "x87",
+   "size": 212,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 5,
+    "INCONCLUSIVE": 3
+   }
+  },
+  {
+   "address": "0x005c43f0",
+   "kind": "x87",
+   "size": 334,
+   "closure": 1,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x005c66b0",
+   "kind": "x87",
+   "size": 270,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "INCONCLUSIVE": 4,
+    "PASS": 4
+   }
+  },
+  {
+   "address": "0x005de5e0",
+   "kind": "x87",
+   "size": 17,
+   "closure": 1,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x005f2ff4",
+   "kind": "x87",
+   "size": 94,
+   "closure": 1,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x0060becd",
+   "kind": "x87",
+   "size": 32,
+   "closure": 5,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x00428ef0",
+   "kind": "string",
+   "size": 57,
+   "closure": 1,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   },
+   "export": "?Get@ZLoadGame@@UAEXPAXI@Z"
+  },
+  {
+   "address": "0x004027e0",
+   "kind": "string",
+   "size": 47,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 8
+   }
+  },
+  {
+   "address": "0x00410140",
+   "kind": "string",
+   "size": 78,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 8
+   }
+  },
+  {
+   "address": "0x00411570",
+   "kind": "string",
+   "size": 288,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 3,
+    "INCONCLUSIVE": 5
+   }
+  },
+  {
+   "address": "0x00415fb0",
+   "kind": "string",
+   "size": 94,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 8
+   }
+  },
+  {
+   "address": "0x00427c20",
+   "kind": "string",
+   "size": 39,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "INCONCLUSIVE": 6,
+    "PASS": 2
+   }
+  },
+  {
+   "address": "0x0042d1e0",
+   "kind": "string",
+   "size": 25,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 8
+   }
+  },
+  {
+   "address": "0x0042d200",
+   "kind": "string",
+   "size": 23,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 8
+   }
+  },
+  {
+   "address": "0x00443753",
+   "kind": "string",
+   "size": 37,
+   "closure": 1,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x0044b010",
+   "kind": "string",
+   "size": 54,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "INCONCLUSIVE": 7,
+    "PASS": 1
+   }
+  },
+  {
+   "address": "0x0044b3c0",
+   "kind": "string",
+   "size": 54,
+   "closure": 1,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x00454c90",
+   "kind": "string",
+   "size": 89,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 8
+   }
+  },
+  {
+   "address": "0x004593b0",
+   "kind": "string",
+   "size": 33,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 8
+   }
+  },
+  {
+   "address": "0x00514ab0",
+   "kind": "string",
+   "size": 28,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "INCONCLUSIVE": 4,
+    "PASS": 4
+   }
+  },
+  {
+   "address": "0x0051da30",
+   "kind": "string",
+   "size": 99,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "INCONCLUSIVE": 7,
+    "PASS": 1
+   }
+  },
+  {
+   "address": "0x0054f260",
+   "kind": "string",
+   "size": 64,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 4,
+    "INCONCLUSIVE": 4
+   }
+  },
+  {
+   "address": "0x0054f2a0",
+   "kind": "string",
+   "size": 81,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 8
+   }
+  },
+  {
+   "address": "0x00576e90",
+   "kind": "string",
+   "size": 22,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 8
+   }
+  },
+  {
+   "address": "0x00579870",
+   "kind": "string",
+   "size": 22,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 8
+   }
+  },
+  {
+   "address": "0x0057a720",
+   "kind": "string",
+   "size": 22,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 8
+   }
+  },
+  {
+   "address": "0x0057cdf0",
+   "kind": "string",
+   "size": 22,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 8
+   }
+  },
+  {
+   "address": "0x00580200",
+   "kind": "string",
+   "size": 22,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 8
+   }
+  },
+  {
+   "address": "0x005960c0",
+   "kind": "string",
+   "size": 64,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "INCONCLUSIVE": 7,
+    "PASS": 1
+   }
+  },
+  {
+   "address": "0x00596100",
+   "kind": "string",
+   "size": 59,
+   "closure": 1,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x00596140",
+   "kind": "string",
+   "size": 43,
+   "closure": 1,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x0059d7d0",
+   "kind": "string",
+   "size": 39,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "INCONCLUSIVE": 3,
+    "PASS": 5
+   }
+  },
+  {
+   "address": "0x005a6080",
+   "kind": "string",
+   "size": 56,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 3,
+    "INCONCLUSIVE": 5
+   }
+  },
+  {
+   "address": "0x005a60c0",
+   "kind": "string",
+   "size": 88,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "INCONCLUSIVE": 6,
+    "PASS": 2
+   }
+  },
+  {
+   "address": "0x005a8f94",
+   "kind": "string",
+   "size": 41,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 8
+   }
+  },
+  {
+   "address": "0x005acc00",
+   "kind": "string",
+   "size": 22,
+   "closure": 1,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x005af470",
+   "kind": "string",
+   "size": 17,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 4,
+    "INCONCLUSIVE": 4
+   }
+  },
+  {
+   "address": "0x005af9a0",
+   "kind": "string",
+   "size": 62,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "INCONCLUSIVE": 6,
+    "PASS": 2
+   }
+  },
+  {
+   "address": "0x005af9e0",
+   "kind": "string",
+   "size": 62,
+   "closure": 1,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x005b3333",
+   "kind": "string",
+   "size": 80,
+   "closure": 1,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x005b335e",
+   "kind": "string",
+   "size": 37,
+   "closure": 1,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x005bd240",
+   "kind": "string",
+   "size": 16,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "INCONCLUSIVE": 4,
+    "PASS": 4
+   }
+  },
+  {
+   "address": "0x005ca830",
+   "kind": "string",
+   "size": 102,
+   "closure": 1,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x005ca930",
+   "kind": "string",
+   "size": 137,
+   "closure": 1,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x005cab00",
+   "kind": "string",
+   "size": 131,
+   "closure": 3,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x005cc580",
+   "kind": "string",
+   "size": 516,
+   "closure": 1,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x00466e80",
+   "kind": "switch",
+   "size": 33,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 8
+   }
+  },
+  {
+   "address": "0x00517850",
+   "kind": "switch",
+   "size": 103,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "INCONCLUSIVE": 4,
+    "PASS": 4
+   }
+  },
+  {
+   "address": "0x005baaef",
+   "kind": "switch",
+   "size": 225,
+   "closure": 1,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x005baf90",
+   "kind": "switch",
+   "size": 524,
+   "closure": 2,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x005bb123",
+   "kind": "switch",
+   "size": 121,
+   "closure": 2,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x005bb36f",
+   "kind": "switch",
+   "size": 104,
+   "closure": 1,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x005bb6e6",
+   "kind": "switch",
+   "size": 101,
+   "closure": 1,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x005bbcda",
+   "kind": "switch",
+   "size": 150,
+   "closure": 2,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x005bc000",
+   "kind": "switch",
+   "size": 407,
+   "closure": 1,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x005bc400",
+   "kind": "switch",
+   "size": 174,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 3,
+    "INCONCLUSIVE": 5
+   }
+  },
+  {
+   "address": "0x005bc7f0",
+   "kind": "switch",
+   "size": 134,
+   "closure": 1,
+   "verdict": "PASS",
+   "vectors": {
+    "INCONCLUSIVE": 4,
+    "PASS": 4
+   }
+  },
+  {
+   "address": "0x005fe2a9",
+   "kind": "switch",
+   "size": 247,
+   "closure": 1,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x005ffa3a",
+   "kind": "switch",
+   "size": 513,
+   "closure": 1,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x005ffe5a",
+   "kind": "switch",
+   "size": 77,
+   "closure": 1,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x00600002",
+   "kind": "switch",
+   "size": 47,
+   "closure": 1,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x006009f2",
+   "kind": "switch",
+   "size": 170,
+   "closure": 2,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x00600d10",
+   "kind": "switch",
+   "size": 352,
+   "closure": 1,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x00600e70",
+   "kind": "switch",
+   "size": 437,
+   "closure": 4,
+   "verdict": "PASS",
+   "vectors": {
+    "INCONCLUSIVE": 7,
+    "PASS": 1
+   }
+  },
+  {
+   "address": "0x006020a0",
+   "kind": "switch",
+   "size": 617,
+   "closure": 5,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x0060217b",
+   "kind": "switch",
+   "size": 398,
+   "closure": 5,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x00602ee0",
+   "kind": "switch",
+   "size": 413,
+   "closure": 2,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 2,
+    "INCONCLUSIVE": 6
+   }
+  },
+  {
+   "address": "0x006034f0",
+   "kind": "switch",
+   "size": 334,
+   "closure": 2,
+   "verdict": "PASS",
+   "vectors": {
+    "INCONCLUSIVE": 6,
+    "PASS": 2
+   }
+  },
+  {
+   "address": "0x00603766",
+   "kind": "switch",
+   "size": 595,
+   "closure": 2,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x00603e60",
+   "kind": "switch",
+   "size": 155,
+   "closure": 2,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x006052c0",
+   "kind": "switch",
+   "size": 523,
+   "closure": 2,
+   "verdict": "PASS",
+   "vectors": {
+    "INCONCLUSIVE": 7,
+    "PASS": 1
+   }
+  },
+  {
+   "address": "0x00605747",
+   "kind": "switch",
+   "size": 541,
+   "closure": 5,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x006061b1",
+   "kind": "switch",
+   "size": 239,
+   "closure": 3,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x00606530",
+   "kind": "switch",
+   "size": 413,
+   "closure": 2,
+   "verdict": "PASS",
+   "vectors": {
+    "INCONCLUSIVE": 6,
+    "PASS": 2
+   }
+  },
+  {
+   "address": "0x00606b60",
+   "kind": "switch",
+   "size": 327,
+   "closure": 2,
+   "verdict": "PASS",
+   "vectors": {
+    "INCONCLUSIVE": 7,
+    "PASS": 1
+   }
+  },
+  {
+   "address": "0x00606dc6",
+   "kind": "switch",
+   "size": 591,
+   "closure": 2,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x006073e0",
+   "kind": "switch",
+   "size": 86,
+   "closure": 2,
+   "verdict": "PASS",
+   "vectors": {
+    "INCONCLUSIVE": 6,
+    "PASS": 2
+   }
+  },
+  {
+   "address": "0x00608c00",
+   "kind": "switch",
+   "size": 69,
+   "closure": 2,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x00609560",
+   "kind": "switch",
+   "size": 102,
+   "closure": 2,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 8
+   }
+  },
+  {
+   "address": "0x0061a7d0",
+   "kind": "switch",
+   "size": 286,
+   "closure": 5,
+   "verdict": "PASS",
+   "vectors": {
+    "INCONCLUSIVE": 5,
+    "PASS": 3
+   }
+  },
+  {
+   "address": "0x0041ecf0",
+   "kind": "calls",
+   "size": 40,
+   "closure": 2,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 8
+   },
+   "export": "?IsDerivedFrom@ZEngineDataBase@@QAE_NII@Z"
+  },
+  {
+   "address": "0x00428c00",
+   "kind": "calls",
+   "size": 49,
+   "closure": 2,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 8
+   },
+   "export": "??0ZLoadGame@@QAE@PADI@Z"
+  },
+  {
+   "address": "0x004dbf10",
+   "kind": "calls",
+   "size": 29,
+   "closure": 2,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   },
+   "export": "?SetParticlePos@ConstrainedParticleSystem@@QAEXHPAM@Z"
+  },
+  {
+   "address": "0x004128c7",
+   "kind": "calls",
+   "size": 662,
+   "closure": 2,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x0046f960",
+   "kind": "calls",
+   "size": 75,
+   "closure": 2,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 8
+   }
+  },
+  {
+   "address": "0x004b3000",
+   "kind": "calls",
+   "size": 18,
+   "closure": 2,
+   "verdict": "PASS",
+   "vectors": {
+    "INCONCLUSIVE": 6,
+    "PASS": 2
+   }
+  },
+  {
+   "address": "0x00590530",
+   "kind": "calls",
+   "size": 174,
+   "closure": 8,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x0059c440",
+   "kind": "calls",
+   "size": 199,
+   "closure": 5,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x005a8177",
+   "kind": "calls",
+   "size": 26,
+   "closure": 2,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x005b7e90",
+   "kind": "calls",
+   "size": 506,
+   "closure": 3,
+   "verdict": "INCONCLUSIVE",
+   "vectors": {
+    "INCONCLUSIVE": 8
+   }
+  },
+  {
+   "address": "0x006083e0",
+   "kind": "calls",
+   "size": 65,
+   "closure": 3,
+   "verdict": "PASS",
+   "vectors": {
+    "PASS": 6,
+    "INCONCLUSIVE": 2
+   }
+  }
+ ]
+}

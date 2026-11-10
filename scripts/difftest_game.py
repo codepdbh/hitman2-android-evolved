@@ -117,7 +117,7 @@ def classify(img: Image, md: Cs, f: dict):
             else:
                 return None, "indirect call/jmp"
         if m == "call": has_call = True
-        if m in ("int", "int3", "in", "out", "hlt", "sysenter", "iretd", "retf"): return None, "system insn"
+        if m in ("int", "int3", "in", "out", "hlt", "sysenter", "iretd", "retf", "rdtsc"): return None, "system insn"
         # An explicit fs:/gs: prefix is TIB access (SEH frames); it needs a simulated
         # TIB, which this harness does not provide. (capstone also reports the
         # IMPLICIT es:/ds: of string instructions as a segment - not a reason.)

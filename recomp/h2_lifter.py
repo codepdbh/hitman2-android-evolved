@@ -52,17 +52,145 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "third_party" / "pcrecomp" / "tools" / "lift"))
 
 import lift32_cpu                                   # noqa: E402
-from capstone.x86 import X86_OP_MEM, X86_OP_REG     # noqa: E402
+from capstone.x86 import X86_OP_IMM, X86_OP_MEM, X86_OP_REG     # noqa: E402
 
 
 _STEP = re.compile(r"c->(esi|edi) \+= ([124]);")
 
+_TERMINATORS = {"ret", "retn", "retf", "iret", "iretd", "hlt", "ud2", "int3"}
+
+
+class _ControlFlowDecoder:
+    """Stands in for the Capstone object inside Lifter so that a function is decoded by following
+    control flow instead of linearly.
+
+    Why: hand-written CRT assembly (memcpy/memmove/strlen...) embeds jump tables and constant data
+    between instructions. A linear sweep decodes those bytes as instructions, loses alignment, and the
+    real instructions after the table are no longer at the addresses the table points to - the stock
+    lift then turns every table target into a `dispatch` to an address with no lifted body
+    (hitman2.exe memmove at 0x0059E830, found by the boot probe).
+
+    Decoding starts at the function start and follows fall-through, direct jump targets and the
+    targets of `jmp [reg*4 + table]`, staying inside the function's extent. Bytes never reached are
+    not decoded. Everything else about lifting is the stock behaviour: this object delegates to the real
+    Capstone for any other attribute."""
+
+    def __init__(self, cs, lifter):
+        self._cs = cs
+        self._lifter = lifter
+        self.func_start = None
+
+    def __getattr__(self, name):
+        return getattr(self._cs, name)
+
+    def disasm(self, code, addr):
+        if self.func_start is None or addr != self.func_start:
+            return iter(())                      # the stock "finish a cut instruction" re-decode: not needed here
+        lo, hi = addr, addr + len(code)
+        read_va = self._lifter.read_va
+        seen = {}
+        work = [addr]
+        while work:
+            a = work.pop()
+            while lo <= a < hi and a not in seen:
+                fetch = code[a - lo:a - lo + 15]
+                if len(fetch) < 15 and read_va:  # an instruction cut by the extent: read the rest from the image
+                    try:
+                        fetch = read_va(a, 15)
+                    except Exception:
+                        pass
+                ins = next(self._cs.disasm(fetch, a, 1), None)
+                if ins is None:
+                    break
+                seen[a] = ins
+                last = ins.mnemonic.split()[-1]
+                nxt = a + ins.size
+                ops = ins.operands
+                if last in _TERMINATORS:
+                    break
+                is_jump = last.startswith("j") or last in ("loop", "loope", "loopne", "loopz", "loopnz")
+                if not is_jump:
+                    a = nxt
+                    continue
+                if ops and ops[0].type == X86_OP_IMM:
+                    work.append(ops[0].imm)
+                elif last == "jmp" and ops and ops[0].type == X86_OP_MEM:
+                    mem = ops[0].mem
+                    table = mem.disp & 0xffffffff
+                    if mem.index and mem.scale == 4 and self._lifter.in_image(table):
+                        work.extend(t for t in self._lifter.resolve_jumptable(table) if lo <= t < hi)
+                if last == "jmp":
+                    break                        # unconditional: no fall-through
+                a = nxt
+        return iter([seen[k] for k in sorted(seen)])
+
 
 class H2Lifter(lift32_cpu.Lifter):
+    def __init__(self, *a, **kw):
+        super().__init__(*a, **kw)
+        self.md = _ControlFlowDecoder(self.md, self)
+        self._extent = (0, 0)
+
+    def lift_function(self, code, start):
+        self.md.func_start = start
+        self._extent = (start, start + len(code))
+        try:
+            return super().lift_function(code, start)
+        finally:
+            self.md.func_start = None
+
+    def resolve_jumptable(self, table_va):
+        """Jump-table arms for `jmp [reg*4 + table_va]`.
+
+        Stock: the run of in-image dwords starting AT table_va. That is wrong when the index is
+        negative: MSVC's memmove ends with `sub ecx,4; jb L; ...; L: jmp [ecx*4 + 0x59E988]` where
+        ecx is -4..-1, so the real table lies in the four dwords BEFORE the base. Reading forward
+        gives bytes of code, no arms, and every arm becomes a `dispatch` to an address inside this very
+        function (no lifted body: 'unresolved dispatch' at 0x0059E9B0).
+        Now: if the forward run is empty, take the run of dwords just before table_va that point
+        inside this function's extent."""
+        fwd = super().resolve_jumptable(table_va)
+        if fwd:
+            return fwd
+        # Not a table at the base. Accept, in this order, a run of in-function code pointers that
+        # starts one slot after the base (index 0 never used: memmove's `and eax,3` after
+        # `test edi,3 / jne` is 1..3), or ends just before it (negative indices).
+        return self._run(table_va + 4, 4) or self._run(table_va - 4, -4)
+
+    def _run(self, va, step, limit=64):
+        lo, hi = self._extent
+        out = []
+        for _ in range(limit):
+            try:
+                v = int.from_bytes(self.read_va(va, 4), "little")
+            except Exception:
+                break
+            if not (lo <= v < hi):
+                break
+            out.append(v)
+            va += step
+        return out
+
     def translate(self, insn, labels):
         m = insn.mnemonic
         if m == "std": return ["c->df = 1;"]
         if m == "cld": return ["c->df = 0;"]
+        # Instructions the stock lifter leaves as RECOMP_TODO although they are plain (found by the
+        # whole-image census, scripts/lift_image.py: pushal 114, popal 22, xlatb 33, clc 18, stc 7, cmc 4,
+        # rdtsc 9 sites in hitman2.exe).
+        if m in ("pushal", "pushad"):
+            # EAX ECX EDX EBX, the ESP value from BEFORE the instruction, EBP ESI EDI.
+            return ["{ uint32_t _sp = c->esp; push32(c, c->eax); push32(c, c->ecx); push32(c, c->edx);"
+                    " push32(c, c->ebx); push32(c, _sp); push32(c, c->ebp); push32(c, c->esi); push32(c, c->edi); }"]
+        if m in ("popal", "popad"):
+            # The saved ESP slot is read and discarded.
+            return ["c->edi = pop32(c); c->esi = pop32(c); c->ebp = pop32(c); (void)pop32(c);"
+                    " c->ebx = pop32(c); c->edx = pop32(c); c->ecx = pop32(c); c->eax = pop32(c);"]
+        if m == "clc": return ["c->cf = 0;"]
+        if m == "stc": return ["c->cf = 1;"]
+        if m == "cmc": return ["c->cf = !c->cf;"]
+        if m == "xlatb": return ["SET8L(c->eax, rd8(c->ebx + R8L(c->eax)));"]
+        if m == "rdtsc": return ["{ uint64_t _t = h2_rdtsc(); c->eax = (uint32_t)_t; c->edx = (uint32_t)(_t >> 32); }"]
         out = super().translate(insn, labels)
         parts = m.split()
         if parts[-1] in lift32_cpu.STRING_OPS and (len(parts) == 1 or parts[0] in lift32_cpu.REP_PREFIXES):

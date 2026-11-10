@@ -17,6 +17,7 @@
 
 #include "h2_platform.h"
 #include "h2_handles.h"
+#include "h2_dispatch.h"
 
 #define ARG(i) (args[(i)])
 #define UNUSED (void)c
@@ -93,15 +94,18 @@ static uint32_t k_GetModuleHandleA(CPU *c, const uint32_t *args)
 static uint32_t k_GetModuleFileNameA(CPU *c, const uint32_t *args)
 {
     UNUSED;
-    if (ARG(0) && ARG(0) != g_img->base) { g_h2_last_error = ERROR_INVALID_HANDLE; return 0; }
-    uint32_t n = (uint32_t)strlen(g_module_path), cap = ARG(2);
+    char path[300];
+    const H2Image *img = ARG(0) ? h2_image_by_handle(ARG(0)) : g_img;
+    if (!img) { g_h2_last_error = ERROR_INVALID_HANDLE; return 0; }
+    snprintf(path, sizeof path, "C:\\Hitman2\\%s", img->name);
+    uint32_t n = (uint32_t)strlen(path), cap = ARG(2);
     if (!cap) return 0;
     if (n >= cap) {                                   /* truncated, still NUL-terminated on NT 5.1+ */
-        memcpy(guest_ptr(ARG(1)), g_module_path, cap - 1); wr8(ARG(1) + cap - 1, 0);
+        memcpy(guest_ptr(ARG(1)), path, cap - 1); wr8(ARG(1) + cap - 1, 0);
         g_h2_last_error = ERROR_INSUFFICIENT_BUFFER;
         return cap;
     }
-    memcpy(guest_ptr(ARG(1)), g_module_path, n + 1);
+    memcpy(guest_ptr(ARG(1)), path, n + 1);
     return n;
 }
 
@@ -459,30 +463,88 @@ static const char *sysmod_by_handle(uint32_t h)
     return 0;
 }
 
-static uint32_t k_GetModuleHandleA2(CPU *c, const uint32_t *args)
+/* Game DLLs (e.g. the renderer) are guest images: lifted code mapped at its base. Reference counts are
+ * kept here; the mapped memory is never released (the lifted code stays linked in). */
+static struct { uint32_t base; unsigned refs; } g_dll_refs[8];
+
+static unsigned *dll_refs(uint32_t base, int create)
 {
-    if (ARG(0)) { uint32_t h = sysmod_by_name(gstr(ARG(0))); if (h) return h; }
-    return k_GetModuleHandleA(c, args);
-}
-static uint32_t k_LoadLibraryA(CPU *c, const uint32_t *args)
-{
-    UNUSED;
-    uint32_t h = sysmod_by_name(gstr(ARG(0)));
-    if (h) return h;
-    /* A DLL that ships with the game (the renderer, EAX, ...) has to be lifted
-     * and mapped as a second guest image. That is not built yet. */
-    h2_guest_stop(H2_STOP_UNIMPLEMENTED_IMPORT, "LoadLibraryA(\"%.200s\"): loading game DLLs is not implemented", gstr(ARG(0)));
-}
-static uint32_t k_FreeLibrary(CPU *c, const uint32_t *args)
-{
-    UNUSED;
-    if (sysmod_by_handle(ARG(0))) return 1;
-    g_h2_last_error = ERROR_INVALID_HANDLE;
+    for (unsigned i = 0; i < 8; i++) if (g_dll_refs[i].base == base) return &g_dll_refs[i].refs;
+    if (create) for (unsigned i = 0; i < 8; i++) if (!g_dll_refs[i].base) { g_dll_refs[i].base = base; return &g_dll_refs[i].refs; }
     return 0;
 }
+
+static uint32_t k_GetModuleHandleA2(CPU *c, const uint32_t *args)
+{
+    if (ARG(0)) {
+        const char *name = gstr(ARG(0));
+        uint32_t h = sysmod_by_name(name);
+        if (h) return h;
+        const H2Image *img = h2_image_by_name(name);
+        if (img && (!img->is_dll || (dll_refs(img->base, 0) && *dll_refs(img->base, 0)))) return img->base;
+    }
+    return k_GetModuleHandleA(c, args);
+}
+
+static uint32_t k_LoadLibraryA(CPU *c, const uint32_t *args)
+{
+    const char *name = gstr(ARG(0));
+    uint32_t h = sysmod_by_name(name);
+    if (h) return h;
+    const H2Image *img = h2_image_by_name(name);
+    H2Image loaded;
+    if (img && img->is_dll && *dll_refs(img->base, 1)) { (*dll_refs(img->base, 1))++; return img->base; }   /* already attached */
+    if (!img) {
+        char guest[300], host[920];
+        const char *bare = strrchr(name, '\\'); bare = bare ? bare + 1 : name;
+        if (strchr(name, ':')) snprintf(guest, sizeof guest, "%s", name);
+        else snprintf(guest, sizeof guest, "C:\\Hitman2\\%s", bare);              /* the application directory */
+        if (h2_files_resolve_read(guest, host, sizeof host) != 0) {
+            H2_WARN(H2_LOG_WIN32, "LoadLibraryA(\"%s\") -> not found", name);
+            g_h2_last_error = ERROR_MOD_NOT_FOUND; return 0;
+        }
+        if (h2_pe_load(host, &loaded) != 0) { g_h2_last_error = 193; return 0; }   /* ERROR_BAD_EXE_FORMAT */
+        img = h2_image_by_handle(loaded.base);
+    }
+    if (!img->entry || !h2_dispatch_has(img->entry))
+        h2_guest_stop(H2_STOP_UNRESOLVED, "%s is mapped but has no lifted code at its entry point %08X "
+                      "(run scripts/lift_image.py lift for this module)", img->name, img->entry);
+    H2_INFO(H2_LOG_WIN32, "LoadLibraryA(\"%s\") -> DllMain(%08X, DLL_PROCESS_ATTACH)", img->name, img->base);
+    if (h2_call_guest(c, img->entry, 3, img->base, 1u, 0u) == 0) {
+        H2_ERROR(H2_LOG_WIN32, "DllMain of %s returned FALSE: load refused", img->name);
+        g_h2_last_error = 1114;                                                   /* ERROR_DLL_INIT_FAILED */
+        return 0;
+    }
+    *dll_refs(img->base, 1) = 1;
+    return img->base;
+}
+
+static uint32_t k_FreeLibrary(CPU *c, const uint32_t *args)
+{
+    if (sysmod_by_handle(ARG(0))) return 1;
+    const H2Image *img = h2_image_by_handle(ARG(0));
+    unsigned *refs = img && img->is_dll ? dll_refs(img->base, 0) : 0;
+    if (!refs || !*refs) { g_h2_last_error = ERROR_INVALID_HANDLE; return 0; }
+    if (--*refs == 0) {
+        H2_INFO(H2_LOG_WIN32, "FreeLibrary(%s) -> DllMain(DLL_PROCESS_DETACH)", img->name);
+        h2_call_guest(c, img->entry, 3, img->base, 0u, 0u);
+    }
+    return 1;
+}
+
 static uint32_t k_GetProcAddress(CPU *c, const uint32_t *args)
 {
     UNUSED;
+    const H2Image *img = h2_image_by_handle(ARG(0));
+    if (img && img->is_dll) {
+        char ord[16];
+        const char *name = gstr(ARG(1));
+        if (ARG(1) < 0x10000u) { snprintf(ord, sizeof ord, "#%u", ARG(1)); name = ord; }
+        uint32_t va = h2_image_export(img, name);
+        if (!va) { H2_WARN(H2_LOG_WIN32, "GetProcAddress(%s, \"%s\") -> not exported", img->name, name); g_h2_last_error = 127; return 0; }
+        H2_INFO(H2_LOG_WIN32, "GetProcAddress(%s, \"%s\") -> %08X", img->name, name, va);
+        return va;
+    }
     const char *mod = sysmod_by_handle(ARG(0));
     char dll[40];
     if (!mod || ARG(1) < 0x10000u) {                                   /* unknown module, or lookup by ordinal */
@@ -500,7 +562,7 @@ static int guest_range_ok(uint32_t addr, uint32_t size)
 {
     uint64_t end = (uint64_t)addr + size;
     if (!size) return 1;
-    if (addr >= g_img->base && end <= (uint64_t)g_img->base + g_img->size) return 1;
+    if (h2_image_contains(addr, size)) return 1;
     if (addr >= H2_STACK_TOP - H2_STACK_SIZE && end <= H2_STACK_TOP) return 1;
     if (addr >= H2_OSDATA_BASE && end <= H2_OSDATA_BASE + H2_OSDATA_SIZE) return 1;
     uint32_t rsize, base = h2_virtual_find(addr, &rsize);
@@ -510,17 +572,17 @@ static uint32_t k_IsBadReadPtr(CPU *c, const uint32_t *args) { UNUSED; return !g
 static uint32_t k_IsBadCodePtr(CPU *c, const uint32_t *args)
 {
     UNUSED;
-    return !(ARG(0) >= g_img->base && ARG(0) - g_img->base < g_img->size);
+    return !h2_image_contains(ARG(0), 1);
 }
 
 /* Answers describe the CPU the lifter models, not the host: no FDIV erratum,
- * MMX/SSE/SSE2 are translated, rdtsc is not (so it is not advertised). */
+ * MMX/SSE/SSE2 and rdtsc are translated. */
 static uint32_t k_IsProcessorFeaturePresent(CPU *c, const uint32_t *args)
 {
     UNUSED;
     switch (ARG(0)) {
-    case 3: case 6: case 10: return 1;      /* PF_MMX, PF_XMMI, PF_XMMI64 */
-    default: return 0;                      /* incl. PF_FLOATING_POINT_PRECISION_ERRATA (0), PF_RDTSC (8) */
+    case 3: case 6: case 8: case 10: return 1;   /* PF_MMX, PF_XMMI, PF_RDTSC, PF_XMMI64 */
+    default: return 0;                           /* incl. PF_FLOATING_POINT_PRECISION_ERRATA (0) */
     }
 }
 
@@ -539,8 +601,57 @@ static uint32_t k_Sleep(CPU *c, const uint32_t *args)
     return 0;
 }
 
+/* Thread attach/detach notifications are never sent (one guest thread), so there is nothing to disable. */
+static uint32_t k_DisableThreadLibraryCalls(CPU *c, const uint32_t *args)
+{
+    UNUSED;
+    if (!h2_image_by_handle(ARG(0)) && !sysmod_by_handle(ARG(0))) { g_h2_last_error = ERROR_INVALID_HANDLE; return 0; }
+    return 1;
+}
+
+/* The environment starts empty (GetEnvironmentStrings reports an empty block); the guest may set variables. */
+#define MAX_ENV 32
+static struct { char name[64]; char value[256]; } g_env[MAX_ENV];
+
+static int env_find(const char *name)
+{
+    for (int i = 0; i < MAX_ENV; i++) {
+        const char *a = g_env[i].name, *b = name;
+        if (!a[0]) continue;
+        while (*a && *b && ((*a | 32) == (*b | 32))) { a++; b++; }
+        if (!*a && !*b) return i;
+    }
+    return -1;
+}
+static uint32_t k_GetEnvironmentVariableA(CPU *c, const uint32_t *args)
+{
+    UNUSED;
+    int i = env_find(gstr(ARG(0)));
+    if (i < 0) { g_h2_last_error = 203; return 0; }                            /* ERROR_ENVVAR_NOT_FOUND */
+    uint32_t n = (uint32_t)strlen(g_env[i].value);
+    if (n + 1 > ARG(2)) return n + 1;                                          /* buffer too small: required size */
+    memcpy(guest_ptr(ARG(1)), g_env[i].value, n + 1);
+    return n;
+}
+static uint32_t k_SetEnvironmentVariableA(CPU *c, const uint32_t *args)
+{
+    UNUSED;
+    const char *name = gstr(ARG(0));
+    if (!name[0] || strchr(name, '=') || strlen(name) >= 64 || (ARG(1) && strlen(gstr(ARG(1))) >= 256)) { g_h2_last_error = ERROR_INVALID_PARAMETER; return 0; }
+    int i = env_find(name);
+    if (!ARG(1)) { if (i < 0) { g_h2_last_error = 203; return 0; } g_env[i].name[0] = 0; return 1; }
+    if (i < 0) for (i = 0; i < MAX_ENV && g_env[i].name[0]; i++) { }
+    if (i == MAX_ENV) { g_h2_last_error = ERROR_NOT_ENOUGH_MEMORY; return 0; }
+    snprintf(g_env[i].name, sizeof g_env[i].name, "%s", name);
+    snprintf(g_env[i].value, sizeof g_env[i].value, "%s", gstr(ARG(1)));
+    return 1;
+}
+
 static const H2ImportDef k_defs[] = {
-    { "KERNEL32.dll", "GetModuleHandleA", 1, k_GetModuleHandleA2 },   /* system DLLs first, then the image itself */
+    { "KERNEL32.dll", "GetModuleHandleA", 1, k_GetModuleHandleA2 },
+    { "KERNEL32.dll", "DisableThreadLibraryCalls", 1, k_DisableThreadLibraryCalls },
+    { "KERNEL32.dll", "GetEnvironmentVariableA", 3, k_GetEnvironmentVariableA },
+    { "KERNEL32.dll", "SetEnvironmentVariableA", 2, k_SetEnvironmentVariableA },   /* system DLLs first, then the image itself */
     { "KERNEL32.dll", "GetLocalTime", 1, k_GetSystemTime },
     { "KERNEL32.dll", "IsBadWritePtr", 2, k_IsBadReadPtr },            /* every committed guest page is read-write */
 #define K(name, n) { "KERNEL32.dll", #name, n, k_##name }

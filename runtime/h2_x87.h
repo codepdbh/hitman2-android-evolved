@@ -8,6 +8,21 @@
 #define H2_X87_H
 
 #include <math.h>
+#include <time.h>
+
+/* rdtsc: a monotonic counter in nanoseconds (a "1 GHz" time-stamp counter). The guest cannot tell the
+ * host's real TSC rate and nothing here claims one; code that calibrates it against a clock sees a
+ * consistent 1 tick/ns. */
+static inline uint64_t h2_rdtsc(void)
+{
+    struct timespec ts;
+#if defined(_WIN32)
+    timespec_get(&ts, TIME_UTC);
+#else
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+#endif
+    return (uint64_t)ts.tv_sec * 1000000000ull + (uint64_t)ts.tv_nsec;
+}
 
 #define H2_FPU_CW_DEFAULT 0x027Fu   /* what a Win32 process starts with: 53-bit precision, round to nearest */
 

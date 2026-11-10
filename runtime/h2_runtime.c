@@ -66,8 +66,8 @@ void h2_guest_stop(h2_stop_reason why, const char *fmt, ...)
     va_start(ap, fmt);
     vsnprintf(msg, sizeof msg, fmt, ap);
     va_end(ap);
-    h2_log(why == H2_STOP_EXIT ? H2_LOG_GAME : H2_LOG_ERROR,
-           why == H2_STOP_EXIT ? H2_LVL_INFO : H2_LVL_FATAL, "guest stopped: %s", msg);
+    int normal = why == H2_STOP_EXIT || why == H2_STOP_REQUESTED;
+    h2_log(normal ? H2_LOG_GAME : H2_LOG_ERROR, normal ? H2_LVL_INFO : H2_LVL_FATAL, "guest stopped: %s", msg);
     if (g_stop) g_stop(why, msg);
     abort();
 }

@@ -4,9 +4,11 @@
 Estados: Implementado · Compilado · Probado · Parcial · Bloqueado · Pendiente.
 "Probado" exige una prueba ejecutada con evidencia en `docs/evidence/` o un comando reproducible.
 
-**En una frase:** el código original se levanta entero a C, compila para ARM64 y una muestra de él se
-comporta igual que el x86 original tanto en PC como en un teléfono real; el juego todavía no arranca
-porque no existen el cargador, la capa Win32, el renderizador, el audio ni los controles.
+**En una frase:** el ejecutable y el renderizador OpenGL originales se levantan enteros a C y compilan para
+ARM64; arrancan desde su punto de entrada, crean su ventana lógica, inicializan OpenGL y el sondeo de
+dispositivos de entrada, y se detienen al pedir el sonido (`EAXDirectSoundCreate8`), con resultado
+**idéntico en el PC y en un teléfono ARM64 real**. Todavía no se dibuja ni un píxel (backend gráfico
+nulo), no hay audio, ni lectura de escenas, ni controles táctiles: no es jugable.
 
 ## Fases
 
@@ -15,8 +17,8 @@ porque no existen el cargador, la capa Win32, el renderizador, el audio ni los c
 | 0 Preparación | **Probado** | Entorno inventariado, PCRecomp fijado, `WORK_SAFE_MODE` con autoprueba |
 | 1 Análisis de ejecutables | **Parcial** | Inventario PE, imports, catálogo de 21.336 funciones. Falta: DLL de render, vtables, grafo por subsistema, Ghidra |
 | 2 Recompilación de prueba | **Probado (x86-64 y ARM64)** | 98 funciones reales pasan la prueba diferencial; en ARM64 real los 544 vectores comparables son idénticos bit a bit al host |
-| 3 Runtime funcional | **Probado (arranque), Parcial (conjunto)** | El programa recompilado completo se enlaza y **arranca desde su punto de entrada en PC y en ARM64 real**: CRT → `WinMain` → hasta el registro de la clase de ventana, con resultado idéntico en ambos. Hechos: cargador PE, despacho global, 73/151 imports, TIB, montón, handles, sistema de archivos. Falta: ventanas/mensajes, hilos, SEH/excepciones C++, carga de DLL del juego, registro |
-| 4 Primer render | Pendiente | Decisión de backend tomada con evidencia estática (`docs/RENDERER_DECISION.md`) |
+| 3 Runtime funcional | **Probado (arranque), Parcial (conjunto)** | Programa completo + `RenderOpenGL.dll` recompilados, enlazados y ejecutados desde el punto de entrada **en PC y en ARM64 real con resultado idéntico**: CRT → `WinMain` → ventana → carga del DLL del renderizador (`DllMain`, 28 imports contra las exportaciones reales del exe) → `Create` → contexto GL → sondeo de extensiones → DirectInput → ini/registro → DirectSound. Hechos: cargador PE multi-imagen, despacho global, 116/151 imports del exe y 105/105 de los del renderizador salvo 5, TIB, montón, handles, archivos, ventanas y cola de mensajes, DirectInput 8, registro. Falta: DirectSound/EAX, hilos, SEH/excepciones C++, bucle de mensajes con fuente de entrada, escenas |
+| 4 Primer render | **Parcial** | La capa OpenGL de función fija (`renderer/`) implementa los 64 imports GL del renderizador original más multitextura/`blend_subtract` y es **ejercitada por el código original** (formato de píxel, contexto, 2 texturas, `glClear`). Backend nulo (cuenta, no dibuja). Pendiente: backend GLES 3 con superficie, primer fotograma real |
 | 5 Carga de escenas | Pendiente | Solo reconocimiento del contenedor (ZIP sin cifrar, 13 tipos de fichero por escena) |
 | 6 Integración Android | **Parcial** | APK de diagnóstico compilado, instalado y ejecutado en el dispositivo. Sin superficie gráfica, entrada, audio ni importación de datos |
 | 7 Jugabilidad | Pendiente | |
@@ -33,10 +35,10 @@ porque no existen el cargador, la capa Win32, el renderizador, el audio ni los c
 | 5 | Informe de imports y dependencias | Probado | `analysis/imports_report.md`, `analysis/dependencies.md` |
 | 6 | Mapa de arquitectura Glacier | Parcial | `analysis/glacier_map.md` (por rutas `__FILE__` y exports; sin asignar funciones a subsistemas) |
 | 7 | Pipeline reproducible de PCRecomp | Parcial | `prepare_image` → `disasm32` → `lift_image` → `difftest_game`; solo `hitman2.exe`, falta `RenderOpenGL.dll` |
-| 8 | Primeras funciones recompiladas | Probado | imagen completa: 21.336 entradas levantadas, 0 excepciones; `docs/evidence/lift_census_2026-11-09.json` |
-| 9 | Pruebas diferenciales | Probado | `scripts/difftest_game.py`; `docs/evidence/difftest_2026-11-09_host_x64_and_arm64.json` |
-| 10 | Runtime inicial | **Probado (arranque)** | `runtime/` (memoria, despacho, registro, parada controlada) + `platform/` (cargador PE, imports, montón, handles, archivos, KERNEL32); `docs/evidence/boot_probe_2026-11-09.txt` |
-| 11 | Adaptación de renderización | Pendiente | solo decisión documentada |
+| 8 | Primeras funciones recompiladas | Probado | exe 21.336/21.336 y renderizador 1.706/1.706 entradas levantadas, 0 excepciones del lifter; `docs/evidence/lift_census_*_2026-11-10.json` |
+| 9 | Pruebas diferenciales | Probado | `scripts/difftest_game.py`; repetida el 2026-11-10 tras cambiar el lifter: mismos resultados (`docs/evidence/difftest_2026-11-10_host_x64_and_arm64.json`) |
+| 10 | Runtime inicial | **Probado (arranque)** | `runtime/` (memoria, despacho con diagnóstico, registro, parada controlada) + `platform/` (cargador PE multi-imagen, imports, montón, handles, archivos, KERNEL32, USER32, DirectInput, registro) + `input/`; `docs/evidence/boot_probe_2026-11-10.txt` |
+| 11 | Adaptación de renderización | **Parcial** | `renderer/h2_gl.c` + backend nulo; decisión en `docs/RENDERER_DECISION.md`. Sin backend gráfico real |
 | 12 | Ejecutable de prueba seguro para PC | Probado (consola) | `pc_test/boot_probe.c` vía `scripts/boot_probe.py`: sin ventana, prioridad baja, con límite de tiempo y de llamadas. No existe aún ejecutable con ventana |
 | 13 | Proyecto Android compilable | **Compilado** | `android/` (Gradle 8.9, AGP 8.7.3, Kotlin 2.1.20, NDK 29, CMake 3.30.5) |
 | 14 | APK de prueba | **Probado** | `docs/evidence/android_selftest_2026-11-09.txt`: 22/22 en SM-S938B. **No es el juego**: no contiene código ni datos de Hitman 2 |
@@ -51,8 +53,8 @@ porque no existen el cargador, la capa Win32, el renderizador, el audio ni los c
 |---|---|---|
 | A Analizar binarios | Parcial | `hitman2.exe` catalogado; DLL de render solo a nivel de imports/strings |
 | B Recompilar y validar funciones | **Probado** | 98/165 muestreadas PASS, 1 divergencia conocida, 66 inconclusas, 0 fallos sin explicar |
-| C Runtime portable | **Probado hasta `WinMain`** | 3.736 llamadas internas y 583 llamadas Win32 ejecutadas, idénticas en x86-64 y ARM64; se detiene en el primer import de ventanas |
-| D Dependencias Windows/render | Parcial | 73 de 151 imports del exe implementados (KERNEL32 de arranque, handles, archivos); USER32/GDI/DirectInput/DirectSound/registro y las 64+19 funciones GL, pendientes |
+| C Runtime portable | **Probado hasta la inicialización de sonido** | 104.926 llamadas internas y 8.554 llamadas Win32/GL/DirectInput ejecutadas, idénticas en x86-64 y ARM64; se detiene en `EAX.DLL!#6` |
+| D Dependencias Windows/render | **Parcial, avanzado** | `tools/missing_imports.py`: 39 imports sin implementar en total (31 KERNEL32 del exe —archivos/hilos/SEH/atoms—, 3 USER32, DirectSound, y 5 KERNEL32 del renderizador). OpenGL 64/64, USER32 y GDI32 del renderizador completos |
 | E Código nativo ARM64 | **Probado para la muestra, Compilado para la imagen completa** | muestra ejecutada en SM-S938B; las 72 unidades de `hitman2.exe` compilan (27 MB de objetos) pero no se han enlazado ni ejecutado |
 | F–J | Pendiente | |
 
@@ -67,16 +69,21 @@ porque no existen el cargador, la capa Win32, el renderizador, el audio ni los c
 - No cubre: llamadas indirectas/virtuales, acceso `fs:` (SEH), imports, hilos. 6.286 + 1.679 funciones quedaron fuera de la muestra por eso.
 - La muestra es el 0,8 % de las funciones del ejecutable.
 
-### Levantado de la imagen completa
-- 21.336 entradas → 1.209.940 líneas de C en 72 unidades; 0 excepciones del lifter.
-- 505 instrucciones sin traducir (`RECOMP_TODO`) en 112 funciones. La mezcla (`pushal` 114, `out` 76, `in` 64, `das` 33, `xlatb` 33, `iretd` 20…) sugiere que la mayoría son datos catalogados como código, **sin verificar**. Si se alcanzan en ejecución, abortan con la dirección; no devuelven éxito.
-- 233 de 9.428 destinos de salto/llamada estáticos no tienen cuerpo levantado: huecos del catálogo por cerrar.
+### Levantado de la imagen completa (2026-11-10)
+| Módulo | Entradas | Líneas de C | `RECOMP_TODO` | Destinos sin cuerpo | Compila host / ARM64 |
+|---|--:|--:|--:|--:|---|
+| `hitman2.exe` | 21.336 | 1.061.774 | 29 sitios en 23 funciones (`int` 16, `fpu` 6, `x87` 5, `int1` 2) | 195 de 9.021 | 72/72 · 72/72 |
+| `RenderOpenGL.dll` | 1.706 | 122.185 | 0 | 11 de 864 | 6/6 · 6/6 |
+
+- Antes del decodificador por flujo de control el exe tenía **505** sitios sin traducir (298 tras añadir `pushal`…): la mayoría eran **datos incrustados en el código** (tablas de saltos del `memmove`/`memcpy` del CRT) decodificados como instrucciones. Ahora son 29; se confirmó la sospecha de la sesión anterior.
+- Una instrucción sin traducir que se alcanza detiene el invitado con su dirección; no devuelve éxito.
+- Destinos sin cuerpo: huecos del catálogo (se ven como `unresolved-dispatch` si se alcanzan).
 - "Compila" es una afirmación sobre la traducción, no sobre la corrección.
 
 ### Sonda de arranque
 - Qué es: el C levantado de `hitman2.exe` completo, enlazado con `runtime/` y `platform/`, ejecutado desde el punto de entrada original. El `.exe` del usuario se carga como datos en la memoria invitada.
-- Qué demuestra: que el código original recompilado inicializa su CRT, ejecuta sus inicializadores C++ y entra en `WinMain`, igual en x86-64 y en ARM64 real (mismo punto de parada, mismos contadores).
-- Qué no demuestra: nada más allá de ese punto. Se detiene en `USER32!GetClassInfoExA`: no hay ventana, mensajes, render, audio ni entrada. 3.736 llamadas es una fracción mínima del programa.
+- Qué demuestra: que el código original recompilado inicializa su CRT, entra en `WinMain`, lee su configuración (`Hitman2.ini` del perfil del puerto), carga y arranca el DLL del renderizador, inicializa OpenGL a través de la capa del proyecto y sondea DirectInput, igual en x86-64 y en ARM64 real (mismo punto de parada, mismos contadores). También que el sondeo de extensiones del renderizador original funciona contra lo que la capa anuncia.
+- Qué no demuestra: nada más allá de ese punto. Se detiene en `EAX.DLL!#6`: no hay audio, bucle de mensajes con entrada, carga de escenas ni un solo píxel dibujado. 104.926 llamadas es una fracción pequeña del programa.
 - Cada parada nombra su causa (import sin implementar, instrucción sin traducir, destino sin cuerpo, fallo de memoria con dirección invitada). Ninguna función devuelve éxito sin hacer su trabajo.
 
 ### APK

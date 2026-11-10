@@ -147,6 +147,15 @@ static int resolve(const char *root, const char *rel, char *out, size_t cap)
 #endif
 }
 
+int h2_files_resolve_read(const char *guest_path, char *host, size_t cap)
+{
+    char rel[520], user[920], game[920];
+    if (guest_to_rel(guest_path, rel, sizeof rel) != 0) return -1;
+    if (resolve(g_user_root, rel, user, sizeof user)) { snprintf(host, cap, "%s", user); return 0; }
+    if (resolve(g_game_root, rel, game, sizeof game)) { snprintf(host, cap, "%s", game); return 0; }
+    return -1;
+}
+
 /* Create the parent directories of a path under the user root. */
 static void make_parents(char *path)
 {
@@ -312,9 +321,30 @@ static uint32_t k_SetCurrentDirectoryA(CPU *c, const uint32_t *args)
     return 1;
 }
 
+/* DeleteFileA: only files the guest itself created (user root) can be deleted.
+ * A file that exists in the game install is read-only to the guest: ACCESS_DENIED,
+ * as for a read-only installation. (A game file the guest had to copy for
+ * writing is also refused, so deleting can never "restore" the original.) */
+static uint32_t k_DeleteFileA(CPU *c, const uint32_t *args)
+{
+    UNUSED;
+    const char *guest = (const char *)guest_ptr(ARG(0));
+    char rel[520], user[920], game[920];
+    if (guest_to_rel(guest, rel, sizeof rel) != 0) { g_h2_last_error = ERR_PATH_NOT_FOUND; return 0; }
+    int in_user = resolve(g_user_root, rel, user, sizeof user), in_game = resolve(g_game_root, rel, game, sizeof game);
+    if (in_game) {
+        H2_WARN(H2_LOG_FILESYSTEM, "DeleteFileA(\"%s\") -> refused: file belongs to the read-only game install", guest);
+        g_h2_last_error = ERR_ACCESS_DENIED; return 0;
+    }
+    if (!in_user) { g_h2_last_error = ERR_FILE_NOT_FOUND; return 0; }
+    if (remove(user) != 0) { g_h2_last_error = ERR_ACCESS_DENIED; return 0; }
+    H2_INFO(H2_LOG_FILESYSTEM, "deleted \"%s\" (user root)", rel);
+    return 1;
+}
+
 static const H2ImportDef k_defs[] = {
 #define K(name, n) { "KERNEL32.dll", #name, n, k_##name }
-    K(CreateFileA, 7), K(ReadFile, 5), K(WriteFile, 5), K(SetFilePointer, 4), K(GetFileSize, 2), K(FlushFileBuffers, 1),
+    K(DeleteFileA, 1), K(CreateFileA, 7), K(ReadFile, 5), K(WriteFile, 5), K(SetFilePointer, 4), K(GetFileSize, 2), K(FlushFileBuffers, 1),
     K(GetCurrentDirectoryA, 2), K(SetCurrentDirectoryA, 1),
 #undef K
 };

@@ -106,6 +106,23 @@ with screenshots once both exist.
   Direct3D 8 (its README lists "DirectX past DirectDraw 2 / DirectSound 1" as
   out of scope). Nothing to reuse either way.
 
+## Evidence update, 2026-11-10 (the decision now rests on a run, not only on static reading)
+
+`RenderOpenGL.dll` is lifted whole (1,706 functions, 0 lifter exceptions, 0 untranslated instructions)
+and runs in the boot probe on the PC and on an ARM64 phone with identical results. Through
+`renderer/h2_gl.c` (backend: null) the original renderer's own initialisation executes: it
+enumerates pixel formats, picks and sets one, creates and activates a context, reads
+`glGetString(GL_EXTENSIONS)`, resolves extension functions, clears the buffer and uploads two
+textures, with **0 GL errors**.
+
+Which extensions it actually asked for, out of the 9 names found in its strings: with the layer
+advertising multitexture and blend-subtract (and not S3TC, paletted textures, anisotropy, NV vertex
+array range or swap control) it called `wglGetProcAddress` for exactly `glActiveTextureARB`,
+`glClientActiveTextureARB`, `glMultiTexCoord2fvARB`, `glMultiTexCoord4fvARB` and
+`glBlendEquationEXT`, and nothing for the ones not advertised. So the renderer does degrade by
+extension as hypothesised; whether every non-advertised path then draws correctly is still untested
+(no pixels are produced yet).
+
 ## What would overturn this
 
 - The GL renderer turning out to be visibly broken or incomplete relative to

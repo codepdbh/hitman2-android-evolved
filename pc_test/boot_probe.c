@@ -22,6 +22,14 @@
 
 #include "h2_platform.h"
 #include "h2_dispatch.h"
+#include "h2_gl.h"
+
+static uint64_t g_stop_after_frames;
+static void on_frame(uint64_t frames)
+{
+    if (g_stop_after_frames && frames >= g_stop_after_frames)
+        h2_guest_stop(H2_STOP_REQUESTED, "%llu frames presented", (unsigned long long)frames);
+}
 
 static jmp_buf g_stop_jmp;
 static h2_stop_reason g_reason;
@@ -30,7 +38,7 @@ static char g_message[512];
 static const char *reason_name(h2_stop_reason r)
 {
     static const char *const n[] = { "exit", "untranslated-instruction", "unresolved-dispatch",
-                                     "unimplemented-import", "budget", "fault", "internal" };
+                                     "unimplemented-import", "budget", "fault", "requested", "internal" };
     return (unsigned)r < sizeof n / sizeof n[0] ? n[r] : "?";
 }
 
@@ -103,12 +111,17 @@ int main(int argc, char **argv)
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--budget") && i + 1 < argc) budget = strtoull(argv[++i], 0, 0);
         else if (!strcmp(argv[i], "--user-root") && i + 1 < argc) user_root = argv[++i];
+        else if (!strcmp(argv[i], "--frames") && i + 1 < argc) g_stop_after_frames = strtoull(argv[++i], 0, 0);
+        else if (!strcmp(argv[i], "--watch") && i + 1 < argc) h2_dispatch_watch((uint32_t)strtoul(argv[++i], 0, 16));
+        else if (!strcmp(argv[i], "--watch-mem") && i + 1 < argc) h2_dispatch_watch_mem((uint32_t)strtoul(argv[++i], 0, 16));
+        else if (!strcmp(argv[i], "--watch-ret") && i + 1 < argc) h2_dispatch_watch_ret((uint32_t)strtoul(argv[++i], 0, 16));
         else if (!strcmp(argv[i], "--trace")) g_h2_trace_imports = 1;
         else if (!strcmp(argv[i], "--calls")) show_calls = 1;
         else path = argv[i];
     }
     if (!path) { fprintf(stderr, "usage: boot_probe <hitman2.exe> [--budget N] [--trace] [--calls]\n"); return 2; }
 
+    setvbuf(stdout, NULL, _IONBF, 0);                      /* a crash must not take the report with it */
     platform_init();
     static H2Image img;
     static CPU cpu;
@@ -117,6 +130,13 @@ int main(int argc, char **argv)
     h2_register_objects();
     h2_register_files();
     h2_register_user32();
+    h2_register_game_dlls();
+    h2_register_dinput8();
+    h2_register_advapi32();
+    h2_register_dsound();
+    h2_gl_set_backend(h2_gl_null_backend());              /* headless: WORK_SAFE_MODE opens no window */
+    h2_gl_set_frame_hook(on_frame);
+    h2_register_opengl();
     {   /* game root = the directory holding the exe; user root given or ./h2_user */
         char root[400];
         snprintf(root, sizeof root, "%s", path);
@@ -128,6 +148,7 @@ int main(int argc, char **argv)
     if (h2_pe_load(path, &img) != 0 || h2_process_init(&img) != 0) return 3;
     h2_kernel32_attach(&img);
     h2_dispatch_set_import_hook(h2_import_dispatch);
+    h2_dispatch_set_name_resolver(h2_import_name_at);
     h2_dispatch_set_budget(budget);
     h2_set_stop_handler(on_stop);
 
@@ -152,10 +173,34 @@ int main(int argc, char **argv)
            cpu.eax, cpu.ecx, cpu.edx, cpu.ebx, cpu.esp, cpu.ebp, cpu.esi, cpu.edi);
     uint32_t trail[H2_TRAIL_LEN];
     size_t nt = h2_dispatch_trail(trail, H2_TRAIL_LEN);
+    {   /* Heuristic backtrace: words on the guest stack that point into a loaded image's code and are
+         * preceded by a call opcode (E8 rel32, or FF /2). A hint for reading a stop, not an unwinder. */
+        unsigned shown = 0;
+        int stack_ok = cpu.esp >= H2_STACK_TOP - H2_STACK_SIZE && cpu.esp < H2_STACK_TOP;
+        printf("  esp=%08X (%s)  guest stack, probable return addresses (nearest first):", cpu.esp,
+               stack_ok ? "inside the guest stack" : "OUTSIDE the guest stack: corrupted");
+        for (uint32_t a = cpu.esp; stack_ok && a < H2_STACK_TOP - 4 && a < cpu.esp + 0x2000 && shown < 20; a += 4) {
+            uint32_t v = rd32(a);
+            if (v < 0x10000u || !h2_image_contains(v - 8, 8)) continue;
+            if (rd8(v - 5) == 0xE8 || (rd8(v - 2) == 0xFF && (rd8(v - 1) & 0x38) == 0x10) || (rd8(v - 3) == 0xFF && (rd8(v - 2) & 0x38) == 0x10)
+                || (rd8(v - 6) == 0xFF && (rd8(v - 5) & 0x38) == 0x10)) { printf(" %08X", v); shown++; }
+        }
+        printf("\n");
+    }
     printf("  last dispatch targets (oldest first):");
-    for (size_t i = nt > 16 ? nt - 16 : 0; i < nt; i++) printf(" %08X", trail[i]);
+    for (size_t i = nt > 16 ? nt - 16 : 0; i < nt; i++) {
+        const char *nm = h2_import_name_at(trail[i]);
+        if (nm) printf(" %08X(%s)", trail[i], nm); else printf(" %08X", trail[i]);
+    }
     printf("\n");
 
+    {
+        H2GLStats gs; h2_gl_get_stats(&gs);
+        printf("  GL: frames=%llu draw_calls=%llu triangles=%llu clears=%llu tex_uploads=%llu (%llu bytes) textures_live=%u gl_errors=%llu\n",
+               (unsigned long long)gs.frames, (unsigned long long)gs.draw_calls, (unsigned long long)gs.triangles,
+               (unsigned long long)gs.clears, (unsigned long long)gs.tex_uploads, (unsigned long long)gs.tex_bytes,
+               gs.textures_live, (unsigned long long)gs.errors);
+    }
     static H2ImportStat st[2048];
     size_t ns = h2_imports_report(st, 2048);
     unsigned called = 0; uint64_t calls = 0;
