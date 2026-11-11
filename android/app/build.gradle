@@ -18,7 +18,7 @@ android {
         externalNativeBuild {
             cmake {
                 arguments '-DANDROID_STL=none'
-                targets 'h2ae'
+                targets 'h2ae', 'h2game'
             }
         }
     }

@@ -21,4 +21,13 @@ object NativeBridge {
      * "N passed, M failed". No game code is involved.
      */
     external fun runSelfTest(): String
+
+    /** Null when libh2game.so (the recompiled game) loaded; otherwise why not. */
+    val gameLoadError: String? = try { System.loadLibrary("h2game"); null } catch (e: UnsatisfiedLinkError) { e.message ?: "UnsatisfiedLinkError" }
+
+    /** Starts the game on a native thread drawing into [surface]. False if it could not start. */
+    external fun startGame(surface: android.view.Surface, gameDir: String, userDir: String): Boolean
+    /** Asks the game to stop and waits for it. */
+    external fun stopGame()
+    external fun gameRunning(): Boolean
 }

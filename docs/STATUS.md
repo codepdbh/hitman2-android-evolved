@@ -22,6 +22,12 @@ nulo), no hay audio, ni lectura de escenas, ni controles táctiles: no es jugabl
   `build/boot/shot_20000.png`; la captura no se versiona porque es salida con arte del juego). **Probado solo como captura única**:
   no hay revisión píxel a píxel contra el original, no se han comparado efectos (niebla, luces, multitextura, texgen) y los
   fotogramas intermedios están sin examinar. Aún no hay ventana (EGL de pantalla), audio audible ni entrada.
+- **El juego corre dentro del APK (2026-11-11):** `GameActivity` (SurfaceView 800x450 escalada por el compositor) arranca
+  `libh2game.so` (código levantado + runtime + plataforma + GLES 3, ~2 min de compilación con 4 trabajos) en un hilo de 256 MiB;
+  lee los datos de `/sdcard/h2androidevolved` (requiere acceso a todos los archivos: `adb shell appops set com.h2ae.android
+  MANAGE_EXTERNAL_STORAGE allow`) y escribe solo en los ficheros privados de la app. Captura de pantalla del teléfono: la secuencia
+  de logos (aparece el logo de IO-Interactive). **Sin entrada táctil, sin audio audible, sin pausa/ciclo de vida** (al destruirse la
+  superficie el juego se detiene). Comando: `adb shell am start -n com.h2ae.android/.GameActivity`.
 - Nuevo: DirectSound 8 (`platform/dsound.c`: dispositivo, búfer primario/secundarios, 3D listener/buffer con parámetros
   guardados; sumidero nulo con reloj real, sin mezclador ni salida audible; EAX/IKsPropertySet y efectos devuelven
   `E_NOINTERFACE`), hilos de invitado cooperativos (`platform/win32_threads.c`: `CreateThread`, `Sleep`, `Wait*`, secciones

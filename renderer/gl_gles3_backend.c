@@ -347,6 +347,7 @@ static int gb_init(int w, int h)
     if (g_ctx == EGL_NO_CONTEXT || !eglMakeCurrent(g_dpy, g_surf, g_surf, g_ctx)) { H2_ERROR(H2_LOG_GRAPHICS, "EGL: context failed (0x%X)", eglGetError()); return -1; }
     H2_INFO(H2_LOG_GRAPHICS, "GLES: %s | %s | %s (%s surface %dx%d)", (const char *)glGetString(GL_VENDOR), (const char *)glGetString(GL_RENDERER),
             (const char *)glGetString(GL_VERSION), g_native_window ? "window" : "pbuffer", w, h);
+    if (g_native_window) eglSwapInterval(g_dpy, 1);         /* pace to the display: the game would otherwise run at hundreds of fps */
     if (build_program() != 0) return -1;
     glGenVertexArrays(1, &g_vao); glGenBuffers(1, &g_vbo); glGenBuffers(1, &g_ebo);
     glBindVertexArray(g_vao); glBindBuffer(GL_ARRAY_BUFFER, g_vbo);
