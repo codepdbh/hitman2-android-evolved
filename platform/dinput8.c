@@ -176,11 +176,14 @@ static uint32_t dev_GetDeviceState(CPU *c, const uint32_t *args)
     if (!rd32(dev + DEV_ACQUIRED)) return DIERR_NOTACQUIRED;
     if (!out || cb != rd32(dev + DEV_DATASIZE)) return E_INVALIDARG;
     if (rd32(dev + DEV_KIND) == 0) {
+        { static int first = 1; if (first) { first = 0; H2_INFO(H2_LOG_INPUT, "DirectInput: the game now polls the keyboard state"); } }
         h2_input_keyboard_state((uint8_t *)guest_ptr(out));
+        { static int last; int any = 0; for (int k = 0; k < 256; k++) any |= ((uint8_t *)guest_ptr(out))[k] & 0x80; if (any != last) { last = any; H2_INFO(H2_LOG_INPUT, "DirectInput keyboard state: a key is %s", any ? "down" : "up"); } }
     } else {
         int32_t dx, dy, dz; uint8_t b[8];
         h2_input_mouse_state(&dx, &dy, &dz, b);
         wr32(out, (uint32_t)dx); wr32(out + 4, (uint32_t)dy); wr32(out + 8, (uint32_t)dz);
+        { static int last; int any = 0; for (int k = 0; k < 8; k++) any |= b[k] & 0x80; if (any != last) { last = any; H2_INFO(H2_LOG_INPUT, "DirectInput mouse state: a button is %s", any ? "down" : "up"); } }
         memcpy(guest_ptr(out + 12), b, cb - 12);                  /* 4 buttons (DIMOUSESTATE) or 8 (DIMOUSESTATE2) */
     }
     return DI_OK;
@@ -191,17 +194,21 @@ static uint32_t dev_GetDeviceData(CPU *c, const uint32_t *args)
     UNUSED;
     uint32_t dev = ARG(0), cb = ARG(1), out = ARG(2), pcount = ARG(3), flags = ARG(4);
     H2InputEvent ev[128];
+    { static int seen[2]; int k = (int)rd32(dev + DEV_KIND) & 1;
+      if (!seen[k]) { seen[k] = 1; H2_INFO(H2_LOG_INPUT, "DirectInput: first GetDeviceData on the %s: acquired=%u buffer=%u", k ? "mouse" : "keyboard", rd32(dev + DEV_ACQUIRED), rd32(dev + DEV_BUFSIZE)); } }
     if (!rd32(dev + DEV_ACQUIRED)) return DIERR_NOTACQUIRED;
     if (!rd32(dev + DEV_BUFSIZE)) return DIERR_NOTBUFFERED;
-    if (cb != 16 || !pcount) return E_INVALIDARG;                 /* sizeof(DIDEVICEOBJECTDATA) in DirectX 8 */
+    if ((cb != 16 && cb != 20) || !pcount) return E_INVALIDARG;   /* DIDEVICEOBJECTDATA: 20 bytes with uAppData (DirectX 8 headers), 16 for the DX3 layout */
     int device = (int)rd32(dev + DEV_KIND);
     uint32_t want = rd32(pcount);
     if (want > 128) want = 128;
     unsigned n = h2_input_take_events(device, ev, want, !(flags & 1) /* DIGDD_PEEK */);
     for (unsigned i = 0; i < n && out; i++) {
-        uint32_t p = out + 16u * i;
+        uint32_t p = out + cb * i;
         wr32(p, ev[i].offset); wr32(p + 4, ev[i].data); wr32(p + 8, ev[i].time_ms); wr32(p + 12, ev[i].sequence);
+        if (cb == 20) wr32(p + 16, 0);                            /* uAppData */
     }
+    if (n) H2_INFO(H2_LOG_INPUT, "DirectInput buffered data: %u event(s) for the %s", n, device ? "mouse" : "keyboard");
     wr32(pcount, n);
     return h2_input_overflowed(device, 1) ? DI_BUFFEROVERFLOW : DI_OK;
 }

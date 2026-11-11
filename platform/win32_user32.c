@@ -25,6 +25,7 @@
  * queue can only be woken by the host's input source (h2_post_message).
  */
 #include <stdarg.h>
+#include <stdatomic.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -317,12 +318,19 @@ static unsigned g_qhead, g_qcount;
 static int g_quit_posted;
 static uint32_t g_quit_code;
 
+/* The queue is fed from the host's UI thread (touch input) and drained by the guest thread: one spin lock. */
+static atomic_flag g_qlock = ATOMIC_FLAG_INIT;
+static void qlock(void) { while (atomic_flag_test_and_set_explicit(&g_qlock, memory_order_acquire)) {} }
+static void qunlock(void) { atomic_flag_clear_explicit(&g_qlock, memory_order_release); }
+
 int h2_post_message(uint32_t hwnd, uint32_t msg, uint32_t wp, uint32_t lp)
 {
-    if (g_qcount == QUEUE) return 0;
+    qlock();
+    if (g_qcount == QUEUE) { qunlock(); return 0; }
     Msg *m = &g_queue[(g_qhead + g_qcount++) % QUEUE];
     m->hwnd = hwnd; m->msg = msg; m->wp = wp; m->lp = lp;
     m->time = (uint32_t)(h2_host_monotonic_ns() / 1000000ull);
+    qunlock();
     return 1;
 }
 uint32_t h2_main_window(void) { return g_active; }
@@ -336,7 +344,12 @@ static void write_msg(uint32_t p, const Msg *m)
 }
 
 /* Returns 1 and fills *out if a message matching the filter exists. */
+static int take_locked(uint32_t hwnd, uint32_t lo, uint32_t hi, int remove, Msg *out);
 static int take(uint32_t hwnd, uint32_t lo, uint32_t hi, int remove, Msg *out)
+{
+    qlock(); int r = take_locked(hwnd, lo, hi, remove, out); qunlock(); return r;
+}
+static int take_locked(uint32_t hwnd, uint32_t lo, uint32_t hi, int remove, Msg *out)
 {
     for (unsigned i = 0; i < g_qcount; i++) {
         Msg *m = &g_queue[(g_qhead + i) % QUEUE];
@@ -392,6 +405,7 @@ static uint32_t u_DispatchMessageA(CPU *c, const uint32_t *args)
 {
     uint32_t p = ARG(0);
     if (!rd32(p)) return 0;                                       /* thread message: no window to deliver to */
+    if (rd32(p + 4) == 0x100 || rd32(p + 4) == 0x101) H2_INFO(H2_LOG_WIN32, "DispatchMessage: key message %03X vk=%02X to the window procedure", rd32(p + 4), rd32(p + 8));
     return send(c, rd32(p), rd32(p + 4), rd32(p + 8), rd32(p + 12));
 }
 

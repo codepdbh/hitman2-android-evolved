@@ -187,6 +187,8 @@ class TouchHudView(context: Context) : View(context) {
     private fun press(b: Btn, down: Boolean) {
         for (k in b.keys) NativeBridge.inputKey(k, down)
         if (b.mouse >= 0) NativeBridge.inputMouseButton(b.mouse, down)
+        // Logos and intro movies are skipped with the mouse button in this game (the keyboard is not polled there).
+        if (ctx == 1 && b.name == "pause") NativeBridge.inputMouseButton(0, down)
         if (down) when (b.kind) { Kind.WHEEL_UP -> NativeBridge.inputWheel(120); Kind.WHEEL_DOWN -> NativeBridge.inputWheel(-120); else -> {} }
     }
 

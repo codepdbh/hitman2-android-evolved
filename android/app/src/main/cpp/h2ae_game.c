@@ -153,9 +153,20 @@ Java_com_h2ae_android_NativeBridge_gameRunning(JNIEnv *env, jobject thiz) { (voi
 /* ---- input from the touch HUD (Kotlin UI thread) -> InputManager; the guest reads it through DirectInput ---- */
 #include "input_manager.h"
 
-JNIEXPORT void JNICALL Java_com_h2ae_android_NativeBridge_inputKey(JNIEnv *e, jobject t, jint dik, jboolean down) { (void)e; (void)t; h2_input_key((unsigned)dik, down); }
+JNIEXPORT void JNICALL Java_com_h2ae_android_NativeBridge_inputKey(JNIEnv *e, jobject t, jint dik, jboolean down)
+{
+    (void)e; (void)t;
+    h2_input_key((unsigned)dik, down);
+    /* Windows delivers a key to the window as a message as well as to DirectInput: some game code (skipping a
+     * cutscene, menus) listens to the message. Same virtual key and scan code the real keyboard would give. */
+    unsigned vk = h2_input_dik_to_vk((unsigned)dik), scan = (unsigned)dik & 0x7Fu, ext = ((unsigned)dik & 0x80u) ? 1u : 0u;
+    uint32_t hwnd = h2_main_window();
+    H2_INFO(H2_LOG_INPUT, "key dik=%02X vk=%02X %s (window %08X)", (unsigned)dik, vk, down ? "down" : "up", hwnd);
+    if (vk && hwnd)
+        h2_post_message(hwnd, down ? 0x100u : 0x101u, vk, 1u | (scan << 16) | (ext << 24) | (down ? 0u : 0xC0000000u));
+}
 JNIEXPORT void JNICALL Java_com_h2ae_android_NativeBridge_inputMouseMove(JNIEnv *e, jobject t, jint dx, jint dy) { (void)e; (void)t; h2_input_mouse_move(dx, dy); }
-JNIEXPORT void JNICALL Java_com_h2ae_android_NativeBridge_inputMouseButton(JNIEnv *e, jobject t, jint i, jboolean down) { (void)e; (void)t; h2_input_mouse_button((unsigned)i, down); }
+JNIEXPORT void JNICALL Java_com_h2ae_android_NativeBridge_inputMouseButton(JNIEnv *e, jobject t, jint i, jboolean down) { (void)e; (void)t; H2_INFO(H2_LOG_INPUT, "mouse button %d %s", (int)i, down ? "down" : "up"); h2_input_mouse_button((unsigned)i, down); }
 JNIEXPORT void JNICALL Java_com_h2ae_android_NativeBridge_inputWheel(JNIEnv *e, jobject t, jint dz) { (void)e; (void)t; h2_input_mouse_wheel(dz); }
 JNIEXPORT void JNICALL Java_com_h2ae_android_NativeBridge_inputCursor(JNIEnv *e, jobject t, jint x, jint y) { (void)e; (void)t; h2_input_cursor(x, y); }
 JNIEXPORT void JNICALL Java_com_h2ae_android_NativeBridge_inputReset(JNIEnv *e, jobject t) { (void)e; (void)t; h2_input_reset(); }

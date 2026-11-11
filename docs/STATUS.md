@@ -44,6 +44,14 @@ nulo), no hay audio, ni lectura de escenas, ni controles táctiles: no es jugabl
   - Clic táctil en menús: el juego solo usa ratón relativo de DirectInput; el toque lleva el cursor a la esquina y lo mueve
     (objetivo / `MouseSpeed`) antes de pulsar. **Sin confirmar en una pantalla de menú**: el modelo del cursor del juego es una
     suposición.
+- **Teclado corregido (2026-11-11):** el juego lee el teclado con `GetDeviceData` de DirectInput usando registros de 20 bytes
+  (`DIDEVICEOBJECTDATA` de DX8, con `uAppData`) y mi capa solo aceptaba 16, así que devolvía error y el juego **nunca recibía
+  ninguna tecla** (tampoco las de `keyboard.cfg` en misión). Ahora acepta 16 y 20. Comprobado en el teléfono: el botón de pausa
+  (Esc) salta los logos y la introducción pasa a `IntroSequence` en ~55 s en lugar de >4 min. Además las teclas se envían también
+  como `WM_KEYDOWN/UP` a la ventana. Las pulsaciones de ratón siguen por el estado inmediato de DirectInput.
+- Arranque directo a una escena para pruebas: `adb shell am start -n com.h2ae.android/.GameActivity --es scene MainMenu.gms`
+  (reescribe `DefaultScene` en el ini del perfil; solo si la actividad no estaba ya abierta).
+- Limitación: si el sistema destruye la superficie (pantalla apagada, app en segundo plano) el juego se detiene y no se reanuda.
 - Nuevo: DirectSound 8 (`platform/dsound.c`: dispositivo, búfer primario/secundarios, 3D listener/buffer con parámetros
   guardados; sumidero nulo con reloj real, sin mezclador ni salida audible; EAX/IKsPropertySet y efectos devuelven
   `E_NOINTERFACE`), hilos de invitado cooperativos (`platform/win32_threads.c`: `CreateThread`, `Sleep`, `Wait*`, secciones

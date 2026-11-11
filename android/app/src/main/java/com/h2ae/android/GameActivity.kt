@@ -53,17 +53,23 @@ class GameActivity : Activity(), SurfaceHolder.Callback {
     }
 
     /** Hitman2.ini with the three port overrides (same as scripts/boot_probe.py write_profile_ini). */
+    /** Optional first scene, e.g. `adb shell am start -n com.h2ae.android/.GameActivity --es scene AllLevels/MainMenu.gms`. */
+    private val startScene: String? get() = intent?.getStringExtra("scene")
+
     private fun writeProfileIni(user: File) {
         user.mkdirs()
         val seen = HashSet<String>()
         val out = ArrayList<String>()
         for (line in File(gameDir, "Hitman2.ini").readLines(Charsets.ISO_8859_1)) {
             val key = line.trim().split(Regex("\\s+")).firstOrNull() ?: ""
-            val l = when (key) {
+            val l = when {
+                key.startsWith("DefaultScene=") && startScene != null -> "DefaultScene=$startScene"
+                else -> when (key) {
                 "DrawDll" -> "DrawDll RenderOpenGL.dll"
                 "Window" -> "Window 1"
                 "Resolution" -> "Resolution 800x450"
                 else -> line
+                }
             }
             seen.add(key); out.add(l)
         }
