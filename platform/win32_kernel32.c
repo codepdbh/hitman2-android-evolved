@@ -579,6 +579,17 @@ static uint32_t k_IsBadCodePtr(CPU *c, const uint32_t *args)
 
 /* Answers describe the CPU the lifter models, not the host: no FDIV erratum,
  * MMX/SSE/SSE2 and rdtsc are translated. */
+/* void RaiseException(DWORD code, DWORD flags, DWORD nargs, const ULONG_PTR *args)
+ * Only the debugger "set thread name" exception (0x406D1388, MS_VC_EXCEPTION) is handled: without a debugger
+ * attached Windows delivers it to the program's own handlers, which swallow it, so ignoring it is what happens.
+ * Any other exception needs real structured exception handling, which is not implemented: the guest stops. */
+static uint32_t k_RaiseException(CPU *c, const uint32_t *args)
+{
+    UNUSED;
+    if (ARG(0) == 0x406D1388u) return 0;
+    h2_guest_stop(H2_STOP_UNIMPLEMENTED_IMPORT, "RaiseException(%08X, flags %08X, %u args): structured exception handling is not implemented", ARG(0), ARG(1), ARG(2));
+}
+
 static uint32_t k_IsProcessorFeaturePresent(CPU *c, const uint32_t *args)
 {
     UNUSED;
@@ -644,7 +655,7 @@ static const H2ImportDef k_defs[] = {
 #define K(name, n) { "KERNEL32.dll", #name, n, k_##name }
     K(GetSystemTimeAsFileTime, 1), K(GetSystemTime, 1), K(GetTimeZoneInformation, 1), K(FileTimeToSystemTime, 2),
     K(FileTimeToLocalFileTime, 2), K(LoadLibraryA, 1), K(FreeLibrary, 1), K(GetProcAddress, 2),
-    K(IsBadReadPtr, 2), K(IsBadCodePtr, 1),
+    K(RaiseException, 4), K(IsBadReadPtr, 2), K(IsBadCodePtr, 1),
     { "kernel32.dll", "IsProcessorFeaturePresent", 1, k_IsProcessorFeaturePresent },
     K(GetVersion, 0), K(GetVersionExA, 1), K(GetCommandLineA, 0), K(GetCurrentProcess, 0), K(GetCurrentThread, 0),
     K(GetLastError, 0), K(GetStartupInfoA, 1), K(GetModuleFileNameA, 3),

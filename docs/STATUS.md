@@ -60,6 +60,13 @@ nulo), no hay audio, ni lectura de escenas, ni controles táctiles: no es jugabl
   **sin comprobar**: el arrastre de botones, los diálogos de ajustes, ni el HUD de misión (no se ha llegado a una misión).
 - Menú principal alcanzado en el teléfono (pantalla de opciones del juego, en español) tras saltar la introducción. Una parada en
   `0059EAF4` (salto indirecto del `memcpy` sin cuerpo) se cerró con `config/lift_extra_entries.json`.
+- **Primera misión en el teléfono (2026-11-11):** desde el menú principal (Empezar → dificultad → Normal) el juego carga
+  `C0-1` (el cobertizo del tutorial) y se ve la escena 3D con HUD del juego, brújula y subtítulos; el joystick táctil (W) mueve
+  al personaje (la pared se acerca entre dos capturas). Para aceptar en los menús el botón envía Enter **y** E (el juego usa
+  `DoAction` = E en `keyboard.cfg`; Enter solo no seleccionaba). `RaiseException` implementado solo para el nombre de hilo del
+  depurador (0x406D1388); cualquier otra excepción sigue parando el invitado (era la parada al empezar la misión).
+  **Sin probar:** girar la cámara, disparar, inventario, el resto de acciones, guardar/cargar, el rendimiento sostenido, las demás
+  misiones, y que el audio de la misión suene bien. Tampoco hay comprobación píxel a píxel contra el original.
 - Nuevo: DirectSound 8 (`platform/dsound.c`: dispositivo, búfer primario/secundarios, 3D listener/buffer con parámetros
   guardados; sumidero nulo con reloj real, sin mezclador ni salida audible; EAX/IKsPropertySet y efectos devuelven
   `E_NOINTERFACE`), hilos de invitado cooperativos (`platform/win32_threads.c`: `CreateThread`, `Sleep`, `Wait*`, secciones

@@ -90,7 +90,7 @@ class TouchHudView(context: Context) : View(context) {
         // menu navigation (shown in menus only; not part of the layout settings)
         Btn("nav_up", "Arriba", Kind.TAP, intArrayOf(UP), menu = true), Btn("nav_down", "Abajo", Kind.TAP, intArrayOf(DOWN), menu = true),
         Btn("nav_left", "Izquierda", Kind.TAP, intArrayOf(LEFT), menu = true), Btn("nav_right", "Derecha", Kind.TAP, intArrayOf(RIGHT), menu = true),
-        Btn("accept", "Aceptar", Kind.TAP, intArrayOf(ENTER), menu = true),
+        Btn("accept", "Aceptar", Kind.TAP, intArrayOf(ENTER, E), menu = true),
     )
     // "holster" exists as an asset but has no binding in this install's keyboard.cfg, so it is not offered.
 
