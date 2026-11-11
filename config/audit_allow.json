@@ -2,5 +2,8 @@
   "_comment": "Paths that PCRecomp's heuristic audit flags but that were reviewed by hand. Patterns are fnmatch. Every entry needs a reason a reader can check. Nothing derived from the game binaries may ever be listed here.",
   "android/branding/icono.png": "The app icon supplied by the project owner; not a file from the game. Flagged because any PNG is treated as possible extracted artwork. Note: it depicts the game's logo and character (KNOWN_ISSUES B4).",
   "android/app/src/main/res/mipmap-*/ic_launcher*.png": "Launcher icons generated from android/branding/icono.png by tools/make_icons.py.",
-  "runtime/h2_dispatch.c": "Hand-written dispatcher. Flagged for its file name (*_dispatch.c) and because it declares lifted symbols through an X-macro; the table itself comes from recomp/generated/*/funcs_list.h, which is git-ignored. It contains no guest addresses."
+  "runtime/h2_dispatch.c": "Hand-written dispatcher. Flagged for its file name (*_dispatch.c) and because it declares lifted symbols through an X-macro; the table itself comes from recomp/generated/*/funcs_list.h, which is git-ignored. It contains no guest addresses.",
+  "android/app/src/main/assets/touch_hud/*.png": "Touch-control pictograms drawn by tools/generate_touch_assets.py on a plate generated with an image tool (design/touch_hud/README.md); no game file is an input. Flagged because any PNG is treated as possible extracted artwork.",
+  "design/touch_hud/*.png": "Source plate and preview of the touch-control pictograms (see design/touch_hud/README.md); not game material.",
+  "design/touch_hud/*.jpg": "Preview image of the touch-control pictograms; not game material."
 }
