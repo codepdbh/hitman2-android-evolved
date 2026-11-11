@@ -131,6 +131,10 @@ typedef void (*h2_thread_runner)(CPU *c, uint32_t entry);
 void h2_threads_set_runner(h2_thread_runner fn);
 void h2_threads_forward_stop(h2_stop_reason why, const char *message);
 void h2_register_threads(void);
+/* ---- what the game is showing (game_context.c): from the scene archive it last opened ---- */
+enum { H2_CTX_BOOT = 0, H2_CTX_INTRO = 1, H2_CTX_MENU = 2, H2_CTX_MISSION = 3 };
+void h2_game_context_note_open(const char *rel_path);
+int  h2_game_context(void);
 void h2_register_objects(void);
 void h2_register_files(void);
 void h2_register_kernel32(void);

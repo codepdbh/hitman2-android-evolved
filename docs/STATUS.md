@@ -28,6 +28,22 @@ nulo), no hay audio, ni lectura de escenas, ni controles táctiles: no es jugabl
   MANAGE_EXTERNAL_STORAGE allow`) y escribe solo en los ficheros privados de la app. Captura de pantalla del teléfono: la secuencia
   de logos (aparece el logo de IO-Interactive). **Sin entrada táctil, sin audio audible, sin pausa/ciclo de vida** (al destruirse la
   superficie el juego se detiene). Comando: `adb shell am start -n com.h2ae.android/.GameActivity`.
+- **HUD táctil, audio y entrada (2026-11-11, segunda tanda):**
+  - HUD (`android/.../TouchHudView.kt`, assets en `android/app/src/main/assets/touch_hud/`): botones según el contexto del juego
+    (`platform/game_context.c`: logos/introducción → solo pausa para saltar con Esc; menús → cruceta + aceptar + pausa/atrás;
+    misión → joystick, disparo, acción, recargar, agacharse, correr, inventario, inclinarse y un panel «⋯» con armas,
+    herramientas, mapa, informe, cámara, zoom y navegación). Teclas tomadas del `keyboard.cfg` real de la instalación, no del
+    manual. El contexto se deduce del archivo de escena que el juego abre (no del estado interno): no distingue caminar de una
+    escena cinemática dentro de una misión. `holster` no tiene tecla en este `keyboard.cfg` y no está conectado.
+  - Audio audible: mezclador de DirectSound (`platform/dsound.c`) → AAudio (`audio/android_aaudio.c`, 44,1 kHz estéreo 16 bit);
+    8/16 bit mono/estéreo, remuestreo lineal, volumen, pan, atenuación por distancia y panorama de 3D (sin Doppler, conos ni
+    EAX). Verificado: el mezclador entrega muestras no nulas (pico ≈6000/32767 con un búfer sonando) y AAudio arranca; **no se ha
+    verificado por oído** ni la calidad.
+  - Faltaban `GetKeyNameTextA`, `MapVirtualKeyA` (tipos 0-2) y `ToAscii` (teclado EE. UU., sin teclas muertas): el juego se
+    detenía en ellos al cargar la introducción; ahora la pasa y reproduce los créditos.
+  - Clic táctil en menús: el juego solo usa ratón relativo de DirectInput; el toque lleva el cursor a la esquina y lo mueve
+    (objetivo / `MouseSpeed`) antes de pulsar. **Sin confirmar en una pantalla de menú**: el modelo del cursor del juego es una
+    suposición.
 - Nuevo: DirectSound 8 (`platform/dsound.c`: dispositivo, búfer primario/secundarios, 3D listener/buffer con parámetros
   guardados; sumidero nulo con reloj real, sin mezclador ni salida audible; EAX/IKsPropertySet y efectos devuelven
   `E_NOINTERFACE`), hilos de invitado cooperativos (`platform/win32_threads.c`: `CreateThread`, `Sleep`, `Wait*`, secciones
@@ -70,7 +86,7 @@ nulo), no hay audio, ni lectura de escenas, ni controles táctiles: no es jugabl
 | 12 | Ejecutable de prueba seguro para PC | Probado (consola) | `pc_test/boot_probe.c` vía `scripts/boot_probe.py`: sin ventana, prioridad baja, con límite de tiempo y de llamadas. No existe aún ejecutable con ventana |
 | 13 | Proyecto Android compilable | **Compilado** | `android/` (Gradle 8.9, AGP 8.7.3, Kotlin 2.1.20, NDK 29, CMake 3.30.5) |
 | 14 | APK de prueba | **Probado** | `docs/evidence/android_selftest_2026-11-09.txt`: 22/22 en SM-S938B. **No es el juego**: no contiene código ni datos de Hitman 2 |
-| 15 | HUD táctil | Pendiente | |
+| 15 | HUD táctil | **Parcial** | Assets visuales implementados en `android/app/src/main/assets/touch_hud/`; catálogo y equivalencias en `design/touch_hud/README.md`. La superposición, el multitáctil y la conexión con la entrada siguen pendientes. |
 | 16 | Informe de compatibilidad | Parcial | `docs/RENDERER_DECISION.md` (matriz GL→GLES, todo "Pendiente") |
 | 17 | Lista de problemas pendientes | Implementado | `docs/KNOWN_ISSUES.md` |
 | 18 | Evidencia de pruebas | Probado | `docs/evidence/` |

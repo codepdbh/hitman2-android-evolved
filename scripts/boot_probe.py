@@ -93,7 +93,7 @@ def build() -> Path | None:
     rsp.write_text("\n".join(f'"{p.as_posix()}"' for p in object_list("host")), encoding="utf-8")
     cc = toolchain.host_cc() + ["-O1", "-std=c11", "-fno-strict-aliasing", "-fwrapv", "-Wall", "-Wno-unused-function",
                                 "-D_CRT_SECURE_NO_WARNINGS",
-                                "-I", ROOT / "build" / "generated" / "include", "-I", rt, "-I", pf, "-I", ROOT / "input", "-I", ROOT / "renderer", "-I", GEN,
+                                "-I", ROOT / "build" / "generated" / "include", "-I", rt, "-I", pf, "-I", ROOT / "input", "-I", ROOT / "renderer", "-I", ROOT / "audio", "-I", GEN,
                                 *src, f"@{rsp}",
                                 "-Wl,/STACK:268435456",      # lifted calls nest on the host stack
                                 "-o", exe]
@@ -107,7 +107,7 @@ def sources(android: bool = False):
     rt, pf = ROOT / "runtime", ROOT / "platform"
     return [ROOT / "pc_test" / "boot_probe.c", rt / "guest_mem.c", rt / "h2_runtime.c", rt / "h2_dispatch.c",
             pf / "imports.c", pf / "pe_loader.c", pf / "guest_alloc.c", pf / "process.c", pf / "win32_kernel32.c",
-            pf / "win32_objects.c", pf / "win32_threads.c", pf / "win32_files.c", pf / "win32_user32.c", pf / "game_dlls.c", pf / "dinput8.c", pf / "win32_advapi32.c", pf / "dsound.c",
+            pf / "win32_objects.c", pf / "win32_threads.c", pf / "win32_files.c", pf / "game_context.c", pf / "win32_user32.c", pf / "game_dlls.c", pf / "dinput8.c", pf / "win32_advapi32.c", pf / "dsound.c",
             ROOT / "input" / "input_manager.c", ROOT / "renderer" / "h2_gl.c", ROOT / "renderer" / "gl_null_backend.c"] + ([ROOT / "renderer" / "gl_gles3_backend.c"] if android else [])
 
 
@@ -143,7 +143,7 @@ def run_android(serial: str, budget: int, frames: int = 0, shots: list | None = 
     exe = OUT / "h2_boot_arm64"
     cc = toolchain.android_cc() + ["-O1", "-std=c11", "-fno-strict-aliasing", "-fwrapv", "-w",
                                    "-I", ROOT / "build" / "generated" / "include", "-I", ROOT / "runtime",
-                                   "-I", ROOT / "platform", "-I", ROOT / "input", "-I", ROOT / "renderer", "-I", GEN, *sources(True), f"@{rsp}", "-lm", "-llog", "-lEGL", "-lGLESv3", "-o", exe]
+                                   "-I", ROOT / "platform", "-I", ROOT / "input", "-I", ROOT / "renderer", "-I", ROOT / "audio", "-I", GEN, *sources(True), f"@{rsp}", "-lm", "-llog", "-lEGL", "-lGLESv3", "-o", exe]
     if worksafe.run(cc, log_name="boot_link_arm64", timeout=1800).returncode != 0:
         print("[arm64] link FAILED, see logs/boot_link_arm64.log"); return None
     adb = [toolchain.find_adb(), "-s", serial]

@@ -8,6 +8,9 @@ import android.os.Bundle
 import android.os.Environment
 import android.provider.Settings
 import android.util.Log
+import android.graphics.RectF
+import android.view.Gravity
+import android.widget.FrameLayout
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 import android.view.View
@@ -20,6 +23,7 @@ import java.io.File
  * original 800x450 and the compositor scales it. Everything the game writes goes to the app's private files.
  */
 class GameActivity : Activity(), SurfaceHolder.Callback {
+    private lateinit var hud: TouchHudView
     private val gameDir = File(Environment.getExternalStorageDirectory(), "h2androidevolved")
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -28,7 +32,21 @@ class GameActivity : Activity(), SurfaceHolder.Callback {
         val sv = SurfaceView(this)
         sv.holder.setFixedSize(800, 450)
         sv.holder.addCallback(this)
-        setContentView(sv)
+        hud = TouchHudView(this)
+        val root = FrameLayout(this)
+        root.setBackgroundColor(0xFF000000.toInt())
+        root.addView(sv, FrameLayout.LayoutParams(1, 1, Gravity.CENTER))
+        root.addView(hud, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
+        // Keep the original 16:9 picture undistorted, centred, with black bars; the HUD covers the whole screen.
+        root.addOnLayoutChangeListener { _, l, t, r, b, _, _, _, _ ->
+            val w = r - l; val h = b - t
+            if (w <= 0 || h <= 0) return@addOnLayoutChangeListener
+            val gw = minOf(w.toFloat(), h * 16f / 9f); val gh = gw * 9f / 16f
+            val lp = sv.layoutParams as FrameLayout.LayoutParams
+            if (lp.width != gw.toInt() || lp.height != gh.toInt()) { lp.width = gw.toInt(); lp.height = gh.toInt(); sv.layoutParams = lp }
+            hud.gameRect = RectF((w - gw) / 2, (h - gh) / 2, (w + gw) / 2, (h + gh) / 2)
+        }
+        setContentView(root)
         @Suppress("DEPRECATION")
         sv.systemUiVisibility = View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
             View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
@@ -67,6 +85,8 @@ class GameActivity : Activity(), SurfaceHolder.Callback {
         val ok = NativeBridge.startGame(holder.surface, gameDir.absolutePath, user.absolutePath)
         Log.i(TAG, "startGame -> $ok")
     }
+
+    override fun onPause() { super.onPause(); hud.releaseAll() }
 
     override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {}
     override fun surfaceDestroyed(holder: SurfaceHolder) { if (NativeBridge.gameLoadError == null) NativeBridge.stopGame() }

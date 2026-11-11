@@ -228,6 +228,7 @@ static uint32_t k_CreateFileA(CPU *c, const uint32_t *args)
     snprintf(o->u.file.host_path, sizeof o->u.file.host_path, "%s", host);
     snprintf(o->name, sizeof o->name, "%.63s", rel);
     g_h2_last_error = (disp == 2 || disp == 4) && exists ? 183 : 0;
+    if (!writing) h2_game_context_note_open(rel);
     H2_INFO(H2_LOG_FILESYSTEM, "open \"%s\" (%s%s) -> handle %X", rel, writing ? "write" : "read",
             host == game ? ", game root" : ", user root", h);
     return h;

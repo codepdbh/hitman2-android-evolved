@@ -30,4 +30,15 @@ object NativeBridge {
     /** Asks the game to stop and waits for it. */
     external fun stopGame()
     external fun gameRunning(): Boolean
+
+    // Input into the game's InputManager (DirectInput scan codes; mouse relative + absolute cursor in game pixels).
+    external fun inputKey(dik: Int, down: Boolean)
+    external fun inputMouseMove(dx: Int, dy: Int)
+    external fun inputMouseButton(index: Int, down: Boolean)
+    external fun inputWheel(dz: Int)
+    external fun inputCursor(x: Int, y: Int)
+    external fun inputReset()
+
+    /** What the game is showing: 0 starting, 1 intro / logos, 2 menu, 3 mission (from the scene it loaded last). */
+    external fun gameContext(): Int
 }

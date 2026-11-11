@@ -18,7 +18,11 @@
  */
 #include <string.h>
 
+#include <math.h>
+#include <stdatomic.h>
+
 #include "h2_platform.h"
+#include "h2_audio.h"
 
 #define ARG(i) (args[(i)])
 #define UNUSED (void)c
@@ -54,8 +58,22 @@ typedef struct {
     uint32_t pos;                         /* play cursor at 'since' */
     uint64_t since;                       /* host ns when 'pos' was captured while playing */
     int      playing, looping;
+    double   fpos;                        /* play cursor in sample frames; advanced by the mixer when a backend is running */
     uint32_t p3d[15];                     /* 3D parameters as raw float dwords: listener (primary) or 3D buffer (secondary) */
 } Buf;
+
+/* ---- mixer ----
+ * With an audio backend the output stream drives everything: h2_ds_mix() (audio thread) mixes every playing
+ * secondary buffer, advancing its play cursor by exactly what it consumed. Guest-thread calls and the mixer
+ * exclude each other with one spin lock. The sample memory itself is read without a lock, as on the real
+ * thing (the game writes behind the play cursor). Without a backend the cursor follows a real-time clock. */
+static atomic_flag g_ds_lock = ATOMIC_FLAG_INIT;
+static int g_mixer_on;
+static const H2AudioBackend *g_audio;
+static void ds_lock(void) { while (atomic_flag_test_and_set_explicit(&g_ds_lock, memory_order_acquire)) {} }
+static void ds_unlock(void) { atomic_flag_clear_explicit(&g_ds_lock, memory_order_release); }
+void h2_audio_set_backend(const H2AudioBackend *b) { g_audio = b; }
+void h2_audio_stop(void) { if (g_audio && g_mixer_on) { g_audio->stop(); g_mixer_on = 0; } }
 
 enum { P3_POS = 0, P3_VEL = 3 };          /* both layouts start with position, velocity */
 enum { L_FRONT = 6, L_TOP = 9, L_DIST = 12, L_DOPPLER = 13, L_ROLLOFF = 14 };
@@ -127,6 +145,7 @@ static Buf *buf_of(uint32_t obj) { uint32_t s = rd32(obj + OBJ_SLOT); return s <
 /* Bring the play cursor up to date from the host clock; stops a finished one-shot buffer. */
 static void buf_advance(Buf *b)
 {
+    if (g_mixer_on) { b->pos = (uint32_t)b->fpos * b->align; return; }      /* the mixer owns the cursor */
     if (!b->playing || b->primary || !b->size) return;
     uint64_t now = h2_host_monotonic_ns();
     uint64_t bytes = (now - b->since) * (uint64_t)b->freq / 1000000000ull * b->align;
@@ -153,10 +172,23 @@ static uint32_t ds_Release(CPU *c, const uint32_t *args)
     return n;
 }
 
-static uint32_t make_3d_object(uint32_t parent, uint32_t vtbl, uint32_t out);
 static uint32_t buf_Release(CPU *c, const uint32_t *args);
+static uint32_t buf_GetCurrentPosition(CPU *c, const uint32_t *args);
+static uint32_t buf_GetStatus(CPU *c, const uint32_t *args);
+static uint32_t buf_Play(CPU *c, const uint32_t *args);
+static uint32_t buf_Stop(CPU *c, const uint32_t *args);
+static uint32_t buf_SetCurrentPosition(CPU *c, const uint32_t *args);
+static uint32_t buf_SetFormat(CPU *c, const uint32_t *args);
+static uint32_t buf_SetVolume(CPU *c, const uint32_t *args);
+static uint32_t buf_SetPan(CPU *c, const uint32_t *args);
+static uint32_t buf_SetFrequency(CPU *c, const uint32_t *args);
+static uint32_t ds_CreateSoundBuffer(CPU *c, const uint32_t *args);
+static uint32_t buf_Lock(CPU *c, const uint32_t *args);
+static uint32_t buf_Unlock(CPU *c, const uint32_t *args);
+static uint32_t make_3d_object(uint32_t parent, uint32_t vtbl, uint32_t out);
+static uint32_t buf_Release_impl(CPU *c, const uint32_t *args);
 
-static uint32_t buf_Release(CPU *c, const uint32_t *args)
+static uint32_t buf_Release_impl(CPU *c, const uint32_t *args)
 {
     UNUSED;
     uint32_t obj = ARG(0), n = rd32(obj + OBJ_REFS);
@@ -218,7 +250,7 @@ static void read_format(Buf *b, uint32_t wfx)
 }
 
 /* CreateSoundBuffer(this, const DSBUFFERDESC *desc, IDirectSoundBuffer **out, IUnknown *outer) */
-static uint32_t ds_CreateSoundBuffer(CPU *c, const uint32_t *args)
+static uint32_t ds_CreateSoundBuffer_impl(CPU *c, const uint32_t *args)
 {
     UNUSED;
     uint32_t desc = ARG(1), out = ARG(2);
@@ -298,7 +330,7 @@ static uint32_t buf_GetCaps(CPU *c, const uint32_t *args)
     return DS_OK;
 }
 
-static uint32_t buf_GetCurrentPosition(CPU *c, const uint32_t *args)
+static uint32_t buf_GetCurrentPosition_impl(CPU *c, const uint32_t *args)
 {
     UNUSED;
     Buf *b = buf_of(ARG(0));
@@ -329,7 +361,7 @@ static uint32_t buf_GetVolume(CPU *c, const uint32_t *args) { UNUSED; Buf *b = b
 static uint32_t buf_GetPan(CPU *c, const uint32_t *args)    { UNUSED; Buf *b = buf_of(ARG(0)); if (!b || !ARG(1)) return DSERR_INVALIDPARAM; wr32(ARG(1), (uint32_t)b->pan); return DS_OK; }
 static uint32_t buf_GetFrequency(CPU *c, const uint32_t *args) { UNUSED; Buf *b = buf_of(ARG(0)); if (!b || !ARG(1)) return DSERR_INVALIDPARAM; wr32(ARG(1), b->freq); return DS_OK; }
 
-static uint32_t buf_GetStatus(CPU *c, const uint32_t *args)
+static uint32_t buf_GetStatus_impl(CPU *c, const uint32_t *args)
 {
     UNUSED;
     Buf *b = buf_of(ARG(0));
@@ -342,7 +374,7 @@ static uint32_t buf_GetStatus(CPU *c, const uint32_t *args)
 static uint32_t buf_Initialize(CPU *c, const uint32_t *args) { UNUSED; (void)args; return 0x88780276u; }   /* ALREADYINITIALIZED */
 
 /* Lock(this, offset, bytes, void **p1, DWORD *n1, void **p2, DWORD *n2, flags) */
-static uint32_t buf_Lock(CPU *c, const uint32_t *args)
+static uint32_t buf_Lock_impl(CPU *c, const uint32_t *args)
 {
     UNUSED;
     Buf *b = buf_of(ARG(0));
@@ -362,7 +394,7 @@ static uint32_t buf_Lock(CPU *c, const uint32_t *args)
     return DS_OK;
 }
 
-static uint32_t buf_Unlock(CPU *c, const uint32_t *args)
+static uint32_t buf_Unlock_impl(CPU *c, const uint32_t *args)
 {
     UNUSED;
     Buf *b = buf_of(ARG(0));
@@ -372,18 +404,18 @@ static uint32_t buf_Unlock(CPU *c, const uint32_t *args)
     return DS_OK;                                                  /* the data already lives in the buffer */
 }
 
-static uint32_t buf_Play(CPU *c, const uint32_t *args)
+static uint32_t buf_Play_impl(CPU *c, const uint32_t *args)
 {
     UNUSED;
     Buf *b = buf_of(ARG(0));
     if (!b || ARG(1) != 0) return DSERR_INVALIDPARAM;
     if (b->primary) { b->playing = 1; return DS_OK; }
-    if (!b->playing) { b->since = h2_host_monotonic_ns(); b->playing = 1; }
+    if (!b->playing) { b->since = h2_host_monotonic_ns(); b->fpos = b->align ? b->pos / b->align : 0; b->playing = 1; }
     b->looping = (ARG(3) & DSBPLAY_LOOPING) != 0;
     return DS_OK;
 }
 
-static uint32_t buf_Stop(CPU *c, const uint32_t *args)
+static uint32_t buf_Stop_impl(CPU *c, const uint32_t *args)
 {
     UNUSED;
     Buf *b = buf_of(ARG(0));
@@ -393,16 +425,16 @@ static uint32_t buf_Stop(CPU *c, const uint32_t *args)
     return DS_OK;
 }
 
-static uint32_t buf_SetCurrentPosition(CPU *c, const uint32_t *args)
+static uint32_t buf_SetCurrentPosition_impl(CPU *c, const uint32_t *args)
 {
     UNUSED;
     Buf *b = buf_of(ARG(0));
     if (!b || b->primary || ARG(1) >= b->size) return DSERR_INVALIDPARAM;
-    b->pos = ARG(1) - ARG(1) % b->align; b->since = h2_host_monotonic_ns();
+    b->pos = ARG(1) - ARG(1) % b->align; b->fpos = b->pos / b->align; b->since = h2_host_monotonic_ns();
     return DS_OK;
 }
 
-static uint32_t buf_SetFormat(CPU *c, const uint32_t *args)
+static uint32_t buf_SetFormat_impl(CPU *c, const uint32_t *args)
 {
     UNUSED;
     Buf *b = buf_of(ARG(0));
@@ -413,7 +445,7 @@ static uint32_t buf_SetFormat(CPU *c, const uint32_t *args)
     return DS_OK;
 }
 
-static uint32_t buf_SetVolume(CPU *c, const uint32_t *args)
+static uint32_t buf_SetVolume_impl(CPU *c, const uint32_t *args)
 {
     UNUSED;
     Buf *b = buf_of(ARG(0)); int32_t v = (int32_t)ARG(1);
@@ -421,7 +453,7 @@ static uint32_t buf_SetVolume(CPU *c, const uint32_t *args)
     b->volume = v;
     return DS_OK;
 }
-static uint32_t buf_SetPan(CPU *c, const uint32_t *args)
+static uint32_t buf_SetPan_impl(CPU *c, const uint32_t *args)
 {
     UNUSED;
     Buf *b = buf_of(ARG(0)); int32_t v = (int32_t)ARG(1);
@@ -429,7 +461,7 @@ static uint32_t buf_SetPan(CPU *c, const uint32_t *args)
     b->pan = v;
     return DS_OK;
 }
-static uint32_t buf_SetFrequency(CPU *c, const uint32_t *args)
+static uint32_t buf_SetFrequency_impl(CPU *c, const uint32_t *args)
 {
     UNUSED;
     Buf *b = buf_of(ARG(0)); uint32_t f = ARG(1);
@@ -526,6 +558,100 @@ static uint32_t p3_SetAll(CPU *c, const uint32_t *args)
 }
 static uint32_t l3_Commit(CPU *c, const uint32_t *args) { UNUSED; (void)args; return DS_OK; }
 
+static uint32_t buf_Release(CPU *c, const uint32_t *args) { ds_lock(); uint32_t r = buf_Release_impl(c, args); ds_unlock(); return r; }
+static uint32_t buf_GetCurrentPosition(CPU *c, const uint32_t *args) { ds_lock(); uint32_t r = buf_GetCurrentPosition_impl(c, args); ds_unlock(); return r; }
+static uint32_t buf_GetStatus(CPU *c, const uint32_t *args) { ds_lock(); uint32_t r = buf_GetStatus_impl(c, args); ds_unlock(); return r; }
+static uint32_t buf_Play(CPU *c, const uint32_t *args) { ds_lock(); uint32_t r = buf_Play_impl(c, args); ds_unlock(); return r; }
+static uint32_t buf_Stop(CPU *c, const uint32_t *args) { ds_lock(); uint32_t r = buf_Stop_impl(c, args); ds_unlock(); return r; }
+static uint32_t buf_SetCurrentPosition(CPU *c, const uint32_t *args) { ds_lock(); uint32_t r = buf_SetCurrentPosition_impl(c, args); ds_unlock(); return r; }
+static uint32_t buf_SetFormat(CPU *c, const uint32_t *args) { ds_lock(); uint32_t r = buf_SetFormat_impl(c, args); ds_unlock(); return r; }
+static uint32_t buf_SetVolume(CPU *c, const uint32_t *args) { ds_lock(); uint32_t r = buf_SetVolume_impl(c, args); ds_unlock(); return r; }
+static uint32_t buf_SetPan(CPU *c, const uint32_t *args) { ds_lock(); uint32_t r = buf_SetPan_impl(c, args); ds_unlock(); return r; }
+static uint32_t buf_SetFrequency(CPU *c, const uint32_t *args) { ds_lock(); uint32_t r = buf_SetFrequency_impl(c, args); ds_unlock(); return r; }
+static uint32_t ds_CreateSoundBuffer(CPU *c, const uint32_t *args) { ds_lock(); uint32_t r = ds_CreateSoundBuffer_impl(c, args); ds_unlock(); return r; }
+static uint32_t buf_Lock(CPU *c, const uint32_t *args) { ds_lock(); uint32_t r = buf_Lock_impl(c, args); ds_unlock(); return r; }
+static uint32_t buf_Unlock(CPU *c, const uint32_t *args) { ds_lock(); uint32_t r = buf_Unlock_impl(c, args); ds_unlock(); return r; }
+
+/* ---- the mixer (audio thread) ---- */
+static float f32bits(uint32_t u) { float f; memcpy(&f, &u, 4); return f; }
+
+/* Per-buffer stereo gains: volume (hundredths of a dB), pan, and for 3D buffers distance attenuation and
+ * left/right placement from the listener. No Doppler, no cone, no rolloff factor other than 1. */
+static void buf_gains(const Buf *b, const Buf *listener, float *gl, float *gr)
+{
+    float g = powf(10.0f, (float)b->volume / 2000.0f), l = 1.0f, r = 1.0f;
+    if (b->pan > 0) l = powf(10.0f, -(float)b->pan / 2000.0f); else if (b->pan < 0) r = powf(10.0f, (float)b->pan / 2000.0f);
+    if ((b->flags & DSBCAPS_CTRL3D) && listener && b->p3d[B_MODE] == 0) {
+        float bp[3], lp[3], fw[3], up[3], d[3], dist = 0, mn = f32bits(b->p3d[B_MIN]), mx = f32bits(b->p3d[B_MAX]);
+        for (int i = 0; i < 3; i++) { bp[i] = f32bits(b->p3d[P3_POS + i]); lp[i] = f32bits(listener->p3d[P3_POS + i]);
+                                      fw[i] = f32bits(listener->p3d[L_FRONT + i]); up[i] = f32bits(listener->p3d[L_TOP + i]); d[i] = bp[i] - lp[i]; dist += d[i] * d[i]; }
+        dist = sqrtf(dist);
+        if (mn < 1e-3f) mn = 1e-3f;
+        float dd = dist > mx ? mx : dist;
+        g *= dd <= mn ? 1.0f : mn / dd;
+        if (dist > 1e-4f) {                                   /* right vector of a left-handed frame: up x front */
+            float rt[3] = { up[1] * fw[2] - up[2] * fw[1], up[2] * fw[0] - up[0] * fw[2], up[0] * fw[1] - up[1] * fw[0] };
+            float rl = sqrtf(rt[0] * rt[0] + rt[1] * rt[1] + rt[2] * rt[2]);
+            if (rl > 1e-6f) {
+                float p = (d[0] * rt[0] + d[1] * rt[1] + d[2] * rt[2]) / (dist * rl);        /* -1 left .. +1 right */
+                if (p > 1) p = 1; if (p < -1) p = -1;
+                float ang = (p + 1.0f) * 0.78539816f;          /* constant power, 0..pi/2 */
+                l *= cosf(ang) * 1.41421356f; r *= sinf(ang) * 1.41421356f;
+            }
+        }
+    }
+    *gl = g * l; *gr = g * r;
+}
+
+void h2_ds_mix(int16_t *out, unsigned frames)
+{
+    static float acc[4096 * 2];
+    if (frames > 4096) frames = 4096;
+    memset(acc, 0, frames * 2 * sizeof(float));
+    ds_lock();
+    unsigned nplaying = 0;
+    const Buf *listener = 0;
+    for (int i = 0; i < MAX_BUFS; i++) if (g_bufs[i].used && g_bufs[i].primary && (g_bufs[i].flags & DSBCAPS_CTRL3D)) { listener = &g_bufs[i]; break; }
+    for (int i = 0; i < MAX_BUFS; i++) {
+        Buf *b = &g_bufs[i];
+        if (!b->used || b->primary || !b->playing || !b->size || !b->align || !b->data) continue;
+        nplaying++;
+        const uint32_t nframes = b->size / b->align;
+        const double step = (double)b->freq / (double)H2_AUDIO_RATE;
+        float gl, gr; buf_gains(b, listener, &gl, &gr);
+        const uint8_t *src = (const uint8_t *)guest_ptr(b->data);
+        double pos = b->fpos;
+        for (unsigned f = 0; f < frames; f++) {
+            if (pos >= nframes) {
+                if (b->looping) pos -= nframes; else { b->playing = 0; pos = 0; break; }
+            }
+            uint32_t i0 = (uint32_t)pos, i1 = i0 + 1 < nframes ? i0 + 1 : (b->looping ? 0 : i0);
+            float fr = (float)(pos - (double)i0), s0[2], s1[2];
+            for (uint32_t ch = 0; ch < 2; ch++) {
+                uint32_t c2 = b->channels == 1 ? 0 : ch;
+                if (b->bits == 16) {
+                    int16_t a, z; memcpy(&a, src + (size_t)i0 * b->align + c2 * 2, 2); memcpy(&z, src + (size_t)i1 * b->align + c2 * 2, 2);
+                    s0[ch] = a; s1[ch] = z;
+                } else {
+                    s0[ch] = (float)((int)src[(size_t)i0 * b->align + c2] - 128) * 256.0f; s1[ch] = (float)((int)src[(size_t)i1 * b->align + c2] - 128) * 256.0f;
+                }
+            }
+            acc[2 * f] += (s0[0] + (s1[0] - s0[0]) * fr) * gl;
+            acc[2 * f + 1] += (s0[1] + (s1[1] - s0[1]) * fr) * gr;
+            pos += step;
+        }
+        b->fpos = pos; b->pos = (uint32_t)pos * b->align;
+    }
+    ds_unlock();
+    static unsigned calls, playing_seen; static float peak;
+    for (unsigned k = 0; k < frames * 2; k++) {
+        float v = acc[k]; out[k] = (int16_t)(v > 32767.0f ? 32767 : v < -32768.0f ? -32768 : v);
+        if (fabsf(v) > peak) peak = fabsf(v);
+    }
+    if (nplaying > playing_seen) playing_seen = nplaying;
+    if (++calls % 800 == 0) { H2_INFO(H2_LOG_AUDIO, "mixer: %u calls, up to %u buffers playing, peak %.0f/32767 since last report", calls, playing_seen, peak); peak = 0; playing_seen = 0; }
+}
+
 /* ---- creation ---- */
 static uint32_t create_device(uint32_t out)
 {
@@ -537,7 +663,8 @@ static uint32_t create_device(uint32_t out)
     wr32(obj + OBJ_VTBL, g_vtbl_ds); wr32(obj + OBJ_REFS, 1);
     g_device = obj;
     wr32(out, obj);
-    H2_INFO(H2_LOG_AUDIO, "IDirectSound8 created (null sink with a real clock; no EAX effects)");
+    if (g_audio && !g_mixer_on && g_audio->start() == 0) g_mixer_on = 1;
+    H2_INFO(H2_LOG_AUDIO, "IDirectSound8 created (%s; no EAX effects)", g_mixer_on ? "mixing to the audio output" : "null sink with a real clock");
     return DS_OK;
 }
 

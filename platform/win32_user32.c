@@ -488,6 +488,85 @@ static uint32_t u_ScreenToClient(CPU *c, const uint32_t *args)
     return 1;
 }
 
+/* ---- keyboard layout services: GetKeyNameTextA, MapVirtualKeyA, ToAscii (US layout) ----
+ * Names come from the DirectInput scan code (what the InputManager uses). A key with no name returns 0, which is
+ * the documented failure result; MapVirtualKey types 0-2 and ToAscii for printable keys are implemented, the
+ * rest (MAPVK_VSC_TO_VK_EX, dead keys, other layouts) is not: ToAscii answers "no translation" (0) for them. */
+static const char *dik_name(unsigned dik)
+{
+    static const char *const n[0x59] = {
+        0, "Esc", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-", "=", "Backspace", "Tab",
+        "Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P", "[", "]", "Enter", "Ctrl", "A", "S",
+        "D", "F", "G", "H", "J", "K", "L", ";", "'", "`", "Shift", "\\", "Z", "X", "C", "V",
+        "B", "N", "M", ",", ".", "/", "Right Shift", "Num *", "Alt", "Space", "Caps Lock", "F1", "F2", "F3", "F4", "F5",
+        "F6", "F7", "F8", "F9", "F10", "Num Lock", "Scroll Lock", "Num 7", "Num 8", "Num 9", "Num -", "Num 4", "Num 5", "Num 6", "Num +", "Num 1",
+        "Num 2", "Num 3", "Num 0", "Num .", 0, 0, 0, "F11", "F12" };
+    if (dik < 0x59) return n[dik];
+    switch (dik) {
+    case 0x9C: return "Num Enter";  case 0x9D: return "Right Ctrl"; case 0xB5: return "Num /";   case 0xB8: return "Right Alt";
+    case 0xC7: return "Home";       case 0xC8: return "Up";         case 0xC9: return "Page Up"; case 0xCB: return "Left";
+    case 0xCD: return "Right";      case 0xCF: return "End";        case 0xD0: return "Down";    case 0xD1: return "Page Down";
+    case 0xD2: return "Insert";     case 0xD3: return "Delete";
+    default: return 0;
+    }
+}
+
+/* int GetKeyNameTextA(LONG lParam, LPSTR buf, int size): scan code in bits 16-23, extended flag in bit 24 */
+static uint32_t u_GetKeyNameTextA(CPU *c, const uint32_t *args)
+{
+    UNUSED;
+    unsigned dik = ((ARG(0) >> 16) & 0x7Fu) | (((ARG(0) >> 24) & 1u) ? 0x80u : 0u);
+    const char *name = dik_name(dik);
+    if (!name || !ARG(1) || (int32_t)ARG(2) <= 0) return 0;
+    size_t n = strlen(name);
+    if (n >= ARG(2)) n = ARG(2) - 1;
+    memcpy(guest_ptr(ARG(1)), name, n); wr8(ARG(1) + (uint32_t)n, 0);
+    return (uint32_t)n;
+}
+
+static uint32_t vk_to_dik(unsigned vk)
+{
+    for (unsigned d = 1; d < 256; d++) if (h2_input_dik_to_vk(d) == vk) return d;
+    return 0;
+}
+
+static unsigned vk_char(unsigned vk, int shift, int caps)
+{
+    static const char shifted_digits[] = ")!@#$%^&*(";
+    if (vk >= 'A' && vk <= 'Z') return (shift ^ caps) ? vk : vk + 32;
+    if (vk >= '0' && vk <= '9') return shift ? (unsigned)shifted_digits[vk - '0'] : vk;
+    if (vk == 0x20) return ' ';
+    static const struct { unsigned vk; char lo, hi; } oem[] = { { 0xBA, ';', ':' }, { 0xBB, '=', '+' }, { 0xBC, ',', '<' }, { 0xBD, '-', '_' },
+        { 0xBE, '.', '>' }, { 0xBF, '/', '?' }, { 0xC0, '`', '~' }, { 0xDB, '[', '{' }, { 0xDC, 0x5C, '|' }, { 0xDD, ']', '}' }, { 0xDE, '\'', '"' } };
+    for (unsigned i = 0; i < sizeof oem / sizeof oem[0]; i++) if (oem[i].vk == vk) return shift ? (unsigned)oem[i].hi : (unsigned)oem[i].lo;
+    return 0;
+}
+
+/* UINT MapVirtualKeyA(UINT code, UINT type): 0 VK->scan, 1 scan->VK, 2 VK->char (uppercase) */
+static uint32_t u_MapVirtualKeyA(CPU *c, const uint32_t *args)
+{
+    UNUSED;
+    switch (ARG(1)) {
+    case 0: return vk_to_dik(ARG(0) & 0xFF) & 0x7Fu;
+    case 1: return h2_input_dik_to_vk(ARG(0) & 0xFF);
+    case 2: return vk_char(ARG(0) & 0xFF, 1, 0) == 0 ? 0 : ((ARG(0) & 0xFF) >= 'A' && (ARG(0) & 0xFF) <= 'Z' ? (ARG(0) & 0xFF) : vk_char(ARG(0) & 0xFF, 0, 0));
+    default: h2_guest_stop(H2_STOP_UNIMPLEMENTED_IMPORT, "MapVirtualKeyA type %u is not implemented", ARG(1));
+    }
+}
+
+/* int ToAscii(UINT vk, UINT scan, const BYTE *keystate, LPWORD out, UINT flags): US layout, no dead keys */
+static uint32_t u_ToAscii(CPU *c, const uint32_t *args)
+{
+    UNUSED;
+    if (!ARG(2) || !ARG(3)) return 0;
+    const uint8_t *ks = (const uint8_t *)guest_ptr(ARG(2));
+    if (ks[0x11] & 0x80) return 0;                                   /* Ctrl combinations produce no printable character here */
+    unsigned ch = vk_char(ARG(0) & 0xFF, (ks[0x10] & 0x80) != 0, (ks[0x14] & 1) != 0);
+    if (!ch) return 0;
+    wr32(ARG(3), ch);
+    return 1;
+}
+
 static uint32_t u_GetKeyboardState(CPU *c, const uint32_t *args) { UNUSED; h2_input_vk_state((uint8_t *)guest_ptr(ARG(0))); return 1; }
 static uint32_t u_GetAsyncKeyState(CPU *c, const uint32_t *args)
 {
@@ -745,6 +824,7 @@ static const H2ImportDef k_defs[] = {
     { "GDI32.dll", "GetStockObject", 1, g_GetStockObject },
     { "GDI32.dll", "GetDeviceCaps", 2, g_GetDeviceCaps },
 #define U(name, n) { "USER32.dll", #name, n, u_##name }
+    U(GetKeyNameTextA, 3), U(MapVirtualKeyA, 2), U(ToAscii, 5),
     U(GetClientRect, 2), U(GetWindowRect, 2), U(ClientToScreen, 2), U(AdjustWindowRectEx, 4), U(MoveWindow, 6),
     U(GetDesktopWindow, 0), U(GetParent, 1), U(GetWindowLongA, 2), U(GetDC, 1), { "USER32.dll", "GetWindowDC", 1, u_GetDC },
     U(ReleaseDC, 2), U(ShowCursor, 1), U(SetCursor, 1), U(GetCursor, 0), U(SetCursorPos, 2), U(ClipCursor, 1),

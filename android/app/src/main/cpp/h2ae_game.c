@@ -18,6 +18,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "h2_audio.h"
 #include "h2_dispatch.h"
 #include "h2_gl.h"
 #include "h2_log.h"
@@ -91,6 +92,7 @@ static void *game_main(void *arg)
     if (guest_mem_init() != 0) { H2_ERROR(H2_LOG_ANDROID, "cannot reserve the guest address space"); g_running = 0; return 0; }
     h2_register_kernel32(); h2_register_objects(); h2_register_threads(); h2_threads_set_runner(thread_runner);
     h2_register_files(); h2_register_user32(); h2_register_game_dlls(); h2_register_dinput8(); h2_register_advapi32(); h2_register_dsound();
+    h2_audio_set_backend(h2_audio_aaudio_backend());
     h2_gl_set_backend(h2_gl_gles3_backend());
     h2_gles3_set_native_window(g_window);
     h2_gl_set_frame_hook(on_frame);
@@ -111,6 +113,7 @@ static void *game_main(void *arg)
     if (returned) { g_reason = H2_STOP_EXIT; snprintf(g_message, sizeof g_message, "entry point returned, eax=%08X", cpu.eax); }
     __android_log_print(ANDROID_LOG_INFO, "H2AE", "GAME STOPPED reason=%d: %s (dispatches=%llu)", (int)g_reason, g_message,
                         (unsigned long long)h2_dispatch_count());
+    h2_audio_stop();
     g_running = 0;
     return 0;
 }
@@ -146,3 +149,16 @@ Java_com_h2ae_android_NativeBridge_stopGame(JNIEnv *env, jobject thiz)
 
 JNIEXPORT jboolean JNICALL
 Java_com_h2ae_android_NativeBridge_gameRunning(JNIEnv *env, jobject thiz) { (void)env; (void)thiz; return g_running ? JNI_TRUE : JNI_FALSE; }
+
+/* ---- input from the touch HUD (Kotlin UI thread) -> InputManager; the guest reads it through DirectInput ---- */
+#include "input_manager.h"
+
+JNIEXPORT void JNICALL Java_com_h2ae_android_NativeBridge_inputKey(JNIEnv *e, jobject t, jint dik, jboolean down) { (void)e; (void)t; h2_input_key((unsigned)dik, down); }
+JNIEXPORT void JNICALL Java_com_h2ae_android_NativeBridge_inputMouseMove(JNIEnv *e, jobject t, jint dx, jint dy) { (void)e; (void)t; h2_input_mouse_move(dx, dy); }
+JNIEXPORT void JNICALL Java_com_h2ae_android_NativeBridge_inputMouseButton(JNIEnv *e, jobject t, jint i, jboolean down) { (void)e; (void)t; h2_input_mouse_button((unsigned)i, down); }
+JNIEXPORT void JNICALL Java_com_h2ae_android_NativeBridge_inputWheel(JNIEnv *e, jobject t, jint dz) { (void)e; (void)t; h2_input_mouse_wheel(dz); }
+JNIEXPORT void JNICALL Java_com_h2ae_android_NativeBridge_inputCursor(JNIEnv *e, jobject t, jint x, jint y) { (void)e; (void)t; h2_input_cursor(x, y); }
+JNIEXPORT void JNICALL Java_com_h2ae_android_NativeBridge_inputReset(JNIEnv *e, jobject t) { (void)e; (void)t; h2_input_reset(); }
+
+/* 0 boot, 1 intro/logos, 2 menu, 3 mission: see platform/game_context.c */
+JNIEXPORT jint JNICALL Java_com_h2ae_android_NativeBridge_gameContext(JNIEnv *e, jobject t) { (void)e; (void)t; return h2_game_context(); }
