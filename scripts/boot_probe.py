@@ -103,18 +103,32 @@ def build() -> Path | None:
     return exe
 
 
-def sources():
+def sources(android: bool = False):
     rt, pf = ROOT / "runtime", ROOT / "platform"
     return [ROOT / "pc_test" / "boot_probe.c", rt / "guest_mem.c", rt / "h2_runtime.c", rt / "h2_dispatch.c",
             pf / "imports.c", pf / "pe_loader.c", pf / "guest_alloc.c", pf / "process.c", pf / "win32_kernel32.c",
             pf / "win32_objects.c", pf / "win32_threads.c", pf / "win32_files.c", pf / "win32_user32.c", pf / "game_dlls.c", pf / "dinput8.c", pf / "win32_advapi32.c", pf / "dsound.c",
-            ROOT / "input" / "input_manager.c", ROOT / "renderer" / "h2_gl.c", ROOT / "renderer" / "gl_null_backend.c"]
+            ROOT / "input" / "input_manager.c", ROOT / "renderer" / "h2_gl.c", ROOT / "renderer" / "gl_null_backend.c"] + ([ROOT / "renderer" / "gl_gles3_backend.c"] if android else [])
 
 
 DEVICE_GAME_DIR = "/sdcard/h2androidevolved"      # where the user's game data lives on the phone (internal storage)
 
 
-def run_android(serial: str, budget: int, frames: int = 0) -> str | None:
+def ppm_to_png(src: Path, dst: Path) -> None:
+    """P6 PPM -> PNG (no third-party imaging library needed)."""
+    import struct, zlib
+    data = src.read_bytes()
+    parts = data.split(b"\n", 3)
+    w, h = (int(x) for x in parts[1].split())
+    pix = parts[3]
+    raw = b"".join(b"\x00" + pix[y * w * 3:(y + 1) * w * 3] for y in range(h))
+    def chunk(t, b): return struct.pack(">I", len(b)) + t + b + struct.pack(">I", zlib.crc32(t + b) & 0xFFFFFFFF)
+    dst.write_bytes(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0))
+                    + chunk(b"IDAT", zlib.compress(raw, 6)) + chunk(b"IEND", b""))
+
+
+def run_android(serial: str, budget: int, frames: int = 0, shots: list | None = None) -> str | None:
+    shots = shots or []
     """Link the same program for arm64-v8a and run it on a device over adb.
     Headless command-line binary under /data/local/tmp; removed afterwards.
     The user's hitman2.exe is copied there only for the run (it is data: the
@@ -129,7 +143,7 @@ def run_android(serial: str, budget: int, frames: int = 0) -> str | None:
     exe = OUT / "h2_boot_arm64"
     cc = toolchain.android_cc() + ["-O1", "-std=c11", "-fno-strict-aliasing", "-fwrapv", "-w",
                                    "-I", ROOT / "build" / "generated" / "include", "-I", ROOT / "runtime",
-                                   "-I", ROOT / "platform", "-I", ROOT / "input", "-I", ROOT / "renderer", "-I", GEN, *sources(), f"@{rsp}", "-lm", "-llog", "-o", exe]
+                                   "-I", ROOT / "platform", "-I", ROOT / "input", "-I", ROOT / "renderer", "-I", GEN, *sources(True), f"@{rsp}", "-lm", "-llog", "-lEGL", "-lGLESv3", "-o", exe]
     if worksafe.run(cc, log_name="boot_link_arm64", timeout=1800).returncode != 0:
         print("[arm64] link FAILED, see logs/boot_link_arm64.log"); return None
     adb = [toolchain.find_adb(), "-s", serial]
@@ -147,8 +161,14 @@ def run_android(serial: str, budget: int, frames: int = 0) -> str | None:
         worksafe.run(adb + ["push", write_profile_ini(), f"{d}/user/Hitman2.ini"], log_name="adb_boot_push3", timeout=60, check=True)
         # 256 MiB host stack, like the PC build: lifted calls nest on it.
         extra = f" --frames {frames}" if frames else ""
+        if shots:
+            extra += " " + " ".join(f"--shot {n} {d}/shot_{n}.ppm" for n in shots[:1]) + " --gles"
         out = sh(f"cd {d} && chmod 755 h2_boot && ulimit -s 262144 2>/dev/null; "
                  f"./h2_boot {game}/hitman2.exe --budget {budget}{extra} --user-root {d}/user 2>/dev/null; echo rc=$?", "adb_boot_run", 900)
+        for n in shots[:1]:
+            ppm = OUT / f"shot_{n}.ppm"
+            worksafe.run(adb + ["pull", f"{d}/shot_{n}.ppm", ppm], log_name="adb_boot_pull", timeout=120)
+            if ppm.exists(): ppm_to_png(ppm, ppm.with_suffix(".png")); print(f"[arm64] frame {n} saved to {ppm.with_suffix('.png')}")
     finally:
         sh(f"rm -rf {d}", "adb_boot_cleanup")
     return "\n".join(l for l in out.splitlines() if not l.startswith("# "))
@@ -162,6 +182,7 @@ def main() -> int:
     ap.add_argument("--trace", action="store_true", help="log every import call")
     ap.add_argument("--calls", action="store_true", help="list imports called, with counts")
     ap.add_argument("--no-build", action="store_true")
+    ap.add_argument("--shot", type=int, action="append", default=[], metavar="FRAME", help="(with --android) render with real GLES 3 and save this frame as a PNG")
     ap.add_argument("--watch-mem", action="append", default=[], metavar="HEXADDR", help="log each change of this guest dword (checked at every dispatch)")
     ap.add_argument("--watch-ret", action="append", default=[], metavar="HEXVA", help="log whenever something is entered with this return address")
     ap.add_argument("--watch", action="append", default=[], metavar="HEXVA", help="log registers each time this guest address is entered")
@@ -184,7 +205,7 @@ def main() -> int:
     print(host_out)
     if args.android:
         try:
-            arm = run_android(args.android, args.budget, args.frames)
+            arm = run_android(args.android, args.budget, args.frames, args.shot)
         except (worksafe.WorkSafeError, toolchain.ToolchainError) as ex:
             arm = None; print(f"[arm64] NOT executed: {ex}")
         if arm:

@@ -114,7 +114,8 @@ int main(int argc, char **argv)
 {
     const char *path = 0, *user_root = "h2_user";
     uint64_t budget = 50000000ull;
-    int show_calls = 0;
+    int show_calls = 0, use_gles = 0;
+    uint64_t shot_frame = 0; const char *shot_path = 0;
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--budget") && i + 1 < argc) budget = strtoull(argv[++i], 0, 0);
         else if (!strcmp(argv[i], "--user-root") && i + 1 < argc) user_root = argv[++i];
@@ -124,6 +125,8 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--watch-ret") && i + 1 < argc) h2_dispatch_watch_ret((uint32_t)strtoul(argv[++i], 0, 16));
         else if (!strcmp(argv[i], "--trace")) g_h2_trace_imports = 1;
         else if (!strcmp(argv[i], "--calls")) show_calls = 1;
+        else if (!strcmp(argv[i], "--gles")) use_gles = 1;
+        else if (!strcmp(argv[i], "--shot") && i + 2 < argc) { shot_frame = strtoull(argv[i + 1], 0, 0); shot_path = argv[i + 2]; i += 2; use_gles = 1; }
         else path = argv[i];
     }
     if (!path) { fprintf(stderr, "usage: boot_probe <hitman2.exe> [--budget N] [--trace] [--calls]\n"); return 2; }
@@ -144,6 +147,14 @@ int main(int argc, char **argv)
     h2_register_advapi32();
     h2_register_dsound();
     h2_gl_set_backend(h2_gl_null_backend());              /* headless: WORK_SAFE_MODE opens no window */
+#if defined(__ANDROID__)
+    if (use_gles) {                                       /* on the phone: real GLES 3 into a headless pbuffer */
+        h2_gl_set_backend(h2_gl_gles3_backend());
+        if (shot_path) h2_gles3_request_capture(shot_path, shot_frame);
+    }
+#else
+    if (use_gles) { fprintf(stderr, "--gles needs the Android build\n"); return 2; }
+#endif
     h2_gl_set_frame_hook(on_frame);
     h2_register_opengl();
     {   /* game root = the directory holding the exe; user root given or ./h2_user */

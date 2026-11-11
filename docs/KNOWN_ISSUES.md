@@ -53,6 +53,22 @@ Las correcciones 1, 2, 3 y 5 son candidatas a enviarse a PCRecomp.
 - `glTexGen` y la iluminación/niebla/combinadores se **almacenan** y se pasan al backend; el backend GLES deberá traducirlos a shaders. Nada de eso está verificado visualmente.
 - El gamma (`SetDeviceGammaRamp`) nunca llega al monitor real: es un posproceso del backend.
 
+## Límites del backend GLES 3 y de los nuevos bloques (2026-11-11)
+
+- GLES 3: sin `glPolygonMode` LINE/POINT, sin sombreado FLAT, sin entorno de textura BLEND (se dibuja como MODULATE), sin
+  iluminación a dos caras ni visor local, sin `glDrawPixels` (avisa una vez), sin stencil. Cada uso se registra una vez.
+  Un filtro con mipmaps sobre una textura con solo el nivel 0 se degrada a su equivalente sin mipmaps.
+- Solo superficie EGL sin ventana (pbuffer): no hay todavía superficie de pantalla ni presentación visible en el teléfono.
+- Audio: sumidero nulo con reloj real; no hay mezclador ni salida audible; 3D guardado pero no espacializado; EAX
+  (`IKsPropertySet`) rechazado con `E_NOINTERFACE`; efectos (`DSBCAPS_CTRLFX`) paran el invitado.
+- Hilos: cooperativos, uno a la vez, prioridades sin efecto; `CREATE_SUSPENDED`/`ResumeThread` no implementados; un hilo que
+  gira sin llamar a una API bloqueante deja sin turno a los demás (las esperas con tiempo 0 que fallan ceden el turno).
+- Las ejecuciones dependen del reloj de pared: el número de fotogramas por unidad de trabajo varía entre ejecuciones, así que
+  los contadores de PC y ARM64 no coinciden; la comparación válida es el motivo de parada y los errores GL.
+- `FindFirstFileA`: sin nombres cortos 8.3 y con atributos solo DIRECTORY/NORMAL.
+- Sin tratar todavía (sondas anteriores los mostraban): `RaiseException`/`RtlUnwind`/SEH, `FormatMessageA`, `GetFileTime`,
+  `CreateDirectoryA`, `MoveFileA`, `CopyFileA`, `GetDiskFreeSpaceExA` y otros imports de la lista de `tools/missing_imports.py`.
+
 ## Límites de la capa de plataforma (`platform/`)
 
 - **Ventanas**: modelo sin bordes sobre una pantalla virtual 800×450; `ChangeDisplaySettings` solo admite el modo virtual; `SetForegroundWindow`/`SetFocus`/`SetCursorPos`/`ClipCursor` actúan solo en el mundo del invitado (nunca tocan el escritorio real). Mensajes no generados: `WM_PAINT`, `WM_GETMINMAXINFO`, `WM_WINDOWPOSCHANGED`, no cliente. `LoadIconA` no comprueba que el recurso exista.

@@ -15,6 +15,13 @@ nulo), no hay audio, ni lectura de escenas, ni controles táctiles: no es jugabl
 - **El juego recompilado entra en su bucle principal** en PC y en el Galaxy S25 (ARM64): pasa el sonido, crea hilos, lee
   `Logos.ZIP`/`.whd`/`.wav`, y presenta fotogramas (40.000 en una ejecución en PC: 667 mil llamadas de dibujo, 0 errores GL;
   300 fotogramas en ARM64 con los datos leídos de `/sdcard/h2androidevolved`). **Sigue sin dibujarse ningún píxel** (backend nulo).
+- **Primer fotograma real (2026-11-11):** con el backend GLES 3 (`renderer/gl_gles3_backend.c`, EGL pbuffer sin ventana, en el
+  Galaxy S25) el renderizador OpenGL original dibuja una escena 3D del juego (cielo nocturno y edificios con bandas de formato
+  panorámico) tras ~20.000 fotogramas, y un fotograma anterior muestra una barra roja de carga. Reproducir:
+  `python scripts/boot_probe.py --no-build --android <serie> --budget 3000000000 --frames 40000 --shot 20000` (guarda
+  `build/boot/shot_20000.png`; la captura no se versiona porque es salida con arte del juego). **Probado solo como captura única**:
+  no hay revisión píxel a píxel contra el original, no se han comparado efectos (niebla, luces, multitextura, texgen) y los
+  fotogramas intermedios están sin examinar. Aún no hay ventana (EGL de pantalla), audio audible ni entrada.
 - Nuevo: DirectSound 8 (`platform/dsound.c`: dispositivo, búfer primario/secundarios, 3D listener/buffer con parámetros
   guardados; sumidero nulo con reloj real, sin mezclador ni salida audible; EAX/IKsPropertySet y efectos devuelven
   `E_NOINTERFACE`), hilos de invitado cooperativos (`platform/win32_threads.c`: `CreateThread`, `Sleep`, `Wait*`, secciones
