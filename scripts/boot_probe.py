@@ -107,11 +107,14 @@ def sources():
     rt, pf = ROOT / "runtime", ROOT / "platform"
     return [ROOT / "pc_test" / "boot_probe.c", rt / "guest_mem.c", rt / "h2_runtime.c", rt / "h2_dispatch.c",
             pf / "imports.c", pf / "pe_loader.c", pf / "guest_alloc.c", pf / "process.c", pf / "win32_kernel32.c",
-            pf / "win32_objects.c", pf / "win32_files.c", pf / "win32_user32.c", pf / "game_dlls.c", pf / "dinput8.c", pf / "win32_advapi32.c", pf / "dsound.c",
+            pf / "win32_objects.c", pf / "win32_threads.c", pf / "win32_files.c", pf / "win32_user32.c", pf / "game_dlls.c", pf / "dinput8.c", pf / "win32_advapi32.c", pf / "dsound.c",
             ROOT / "input" / "input_manager.c", ROOT / "renderer" / "h2_gl.c", ROOT / "renderer" / "gl_null_backend.c"]
 
 
-def run_android(serial: str, budget: int) -> str | None:
+DEVICE_GAME_DIR = "/sdcard/h2androidevolved"      # where the user's game data lives on the phone (internal storage)
+
+
+def run_android(serial: str, budget: int, frames: int = 0) -> str | None:
     """Link the same program for arm64-v8a and run it on a device over adb.
     Headless command-line binary under /data/local/tmp; removed afterwards.
     The user's hitman2.exe is copied there only for the run (it is data: the
@@ -135,12 +138,17 @@ def run_android(serial: str, budget: int) -> str | None:
     try:
         sh(f"rm -rf {d}; mkdir -p {d}/game {d}/user", "adb_boot_mkdir")
         worksafe.run(adb + ["push", exe, f"{d}/h2_boot"], log_name="adb_boot_push1", timeout=600, check=True)
-        for name in GAME_FILES:                                  # the game's own files, as data, for this run only
-            worksafe.run(adb + ["push", GAME_DIR / name, f"{d}/game/{name}"], log_name="adb_boot_push2", timeout=600, check=True)
+        # The game data lives on the phone's internal storage (the user's own copy, pushed once): read in place.
+        game = DEVICE_GAME_DIR if "hitman2.exe" in sh(f"ls {DEVICE_GAME_DIR} 2>/dev/null", "adb_boot_lsgame") else None
+        if game is None:                                         # otherwise the game's own files, as data, for this run only
+            game = f"{d}/game"
+            for name in GAME_FILES:
+                worksafe.run(adb + ["push", GAME_DIR / name, f"{d}/game/{name}"], log_name="adb_boot_push2", timeout=600, check=True)
         worksafe.run(adb + ["push", write_profile_ini(), f"{d}/user/Hitman2.ini"], log_name="adb_boot_push3", timeout=60, check=True)
         # 256 MiB host stack, like the PC build: lifted calls nest on it.
+        extra = f" --frames {frames}" if frames else ""
         out = sh(f"cd {d} && chmod 755 h2_boot && ulimit -s 262144 2>/dev/null; "
-                 f"./h2_boot game/hitman2.exe --budget {budget} --user-root {d}/user 2>/dev/null; echo rc=$?", "adb_boot_run", 600)
+                 f"./h2_boot {game}/hitman2.exe --budget {budget}{extra} --user-root {d}/user 2>/dev/null; echo rc=$?", "adb_boot_run", 900)
     finally:
         sh(f"rm -rf {d}", "adb_boot_cleanup")
     return "\n".join(l for l in out.splitlines() if not l.startswith("# "))
@@ -176,7 +184,7 @@ def main() -> int:
     print(host_out)
     if args.android:
         try:
-            arm = run_android(args.android, args.budget)
+            arm = run_android(args.android, args.budget, args.frames)
         except (worksafe.WorkSafeError, toolchain.ToolchainError) as ex:
             arm = None; print(f"[arm64] NOT executed: {ex}")
         if arm:

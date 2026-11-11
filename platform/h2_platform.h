@@ -117,6 +117,20 @@ int  h2_registry_set_string(const char *path, const char *name, const char *valu
 int  h2_registry_set_dword(const char *path, const char *name, uint32_t value);
 void h2_register_dsound(void);                              /* DirectSound: device enumeration only, so far */
 void h2_register_dinput8(void);                           /* DirectInput 8 over input/input_manager.h */
+/* ---- guest threads (win32_threads.c) ----
+ * Cooperative: exactly one guest thread runs at a time, each on its own host thread, and control moves only
+ * inside Sleep / Wait* / SwitchToThread / a contended critical section / thread exit. Deterministic and
+ * single-core by construction; thread priorities are recorded and have no effect. */
+uint32_t h2_thread_tid(void);                                    /* id of the running guest thread (main = 0x104) */
+uint32_t h2_wait_objects(CPU *c, unsigned n, const uint32_t *handles, int wait_all, uint32_t timeout_ms);
+void     h2_thread_sleep(CPU *c, uint32_t ms);                   /* ms == 0 yields */
+void     h2_thread_block_on_cs(CPU *c, uint32_t cs);             /* returns when the critical section's owner field is free */
+/* How a secondary guest thread runs its entry point under the host's fault guard; on a fault it must call
+ * h2_threads_forward_stop(reason, message) (never returns). The default runner is an unguarded dispatch. */
+typedef void (*h2_thread_runner)(CPU *c, uint32_t entry);
+void h2_threads_set_runner(h2_thread_runner fn);
+void h2_threads_forward_stop(h2_stop_reason why, const char *message);
+void h2_register_threads(void);
 void h2_register_objects(void);
 void h2_register_files(void);
 void h2_register_kernel32(void);

@@ -10,6 +10,21 @@ dispositivos de entrada, y se detienen al pedir el sonido (`EAXDirectSoundCreate
 **idéntico en el PC y en un teléfono ARM64 real**. Todavía no se dibuja ni un píxel (backend gráfico
 nulo), no hay audio, ni lectura de escenas, ni controles táctiles: no es jugable.
 
+## Actualización 2026-11-11 (bloque 3)
+
+- **El juego recompilado entra en su bucle principal** en PC y en el Galaxy S25 (ARM64): pasa el sonido, crea hilos, lee
+  `Logos.ZIP`/`.whd`/`.wav`, y presenta fotogramas (40.000 en una ejecución en PC: 667 mil llamadas de dibujo, 0 errores GL;
+  300 fotogramas en ARM64 con los datos leídos de `/sdcard/h2androidevolved`). **Sigue sin dibujarse ningún píxel** (backend nulo).
+- Nuevo: DirectSound 8 (`platform/dsound.c`: dispositivo, búfer primario/secundarios, 3D listener/buffer con parámetros
+  guardados; sumidero nulo con reloj real, sin mezclador ni salida audible; EAX/IKsPropertySet y efectos devuelven
+  `E_NOINTERFACE`), hilos de invitado cooperativos (`platform/win32_threads.c`: `CreateThread`, `Sleep`, `Wait*`, secciones
+  críticas; uno a la vez, prioridades sin efecto), `FindFirstFileA`/`FindNextFileA`/`FindClose`, textura 0 de GL.
+- Lifter: cierre de huecos (`gap_entries_added` = 253 entradas extra para destinos de salto que el catálogo no tenía): destinos
+  sin cuerpo en el exe 195 → 2.
+- Los contadores de una ejecución dependen del reloj de pared, así que PC y ARM64 ya no dan contadores idénticos; la
+  comparación válida es el motivo de parada y la ausencia de errores.
+- Datos del juego en el teléfono: `/sdcard/h2androidevolved` (copia del usuario, fuera del repositorio).
+
 ## Fases
 
 | Fase | Estado | Resumen |

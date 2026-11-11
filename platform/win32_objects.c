@@ -61,6 +61,7 @@ static uint32_t k_CreateMutexA(CPU *c, const uint32_t *args)
     if (!(h = h2_handle_new(H2_OBJ_MUTEX, &o))) { g_h2_last_error = 8; return 0; }
     strncpy(o->name, name, sizeof o->name - 1);
     o->u.sync.count = ARG(1) ? 1 : 0;                           /* bInitialOwner */
+    o->u.sync.owner = ARG(1) ? (int)h2_thread_tid() : 0;
     g_h2_last_error = 0;                                        /* callers test GetLastError() == ERROR_ALREADY_EXISTS */
     return h;
 }
@@ -97,19 +98,44 @@ static uint32_t k_ResetEvent(CPU *c, const uint32_t *args)
     return 1;
 }
 
+int h2_obj_signaled(H2Object *o, int tid)
+{
+    switch (o->type) {
+    case H2_OBJ_EVENT:  return o->u.sync.count != 0;
+    case H2_OBJ_MUTEX:  return o->u.sync.count == 0 || o->u.sync.owner == tid;
+    case H2_OBJ_THREAD: return h2_thread_done(o->u.thread.index);
+    default:            return 0;
+    }
+}
+
+void h2_obj_acquire(H2Object *o, int tid)
+{
+    if (o->type == H2_OBJ_EVENT) { if (!o->u.sync.manual) o->u.sync.count = 0; }
+    else if (o->type == H2_OBJ_MUTEX) { o->u.sync.count++; o->u.sync.owner = tid; }
+}
+
 static uint32_t k_WaitForSingleObject(CPU *c, const uint32_t *args)
 {
+    uint32_t h = ARG(0);
+    return h2_wait_objects(c, 1, &h, 0, ARG(1));
+}
+
+/* (count, const HANDLE *handles, bWaitAll, timeout) */
+static uint32_t k_WaitForMultipleObjects(CPU *c, const uint32_t *args)
+{
+    uint32_t n = ARG(0), h[16];
+    if (n < 1 || n > 16 || !ARG(1)) { g_h2_last_error = 87; return 0xFFFFFFFFu; }
+    for (uint32_t i = 0; i < n; i++) h[i] = rd32(ARG(1) + 4 * i);
+    return h2_wait_objects(c, n, h, ARG(2) != 0, ARG(3));
+}
+
+static uint32_t k_ReleaseMutex(CPU *c, const uint32_t *args)
+{
     UNUSED;
-    H2Object *o = h2_handle_get(ARG(0), H2_OBJ_ANY);
-    if (!o) { g_h2_last_error = 6; return 0xFFFFFFFFu; }        /* WAIT_FAILED */
-    if (o->type == H2_OBJ_MUTEX) { o->u.sync.count++; return 0; }   /* the only thread always gets it */
-    if (o->type == H2_OBJ_EVENT) {
-        if (o->u.sync.count) { if (!o->u.sync.manual) o->u.sync.count = 0; return 0; }
-        if (ARG(1) != 0xFFFFFFFFu) return 0x102;                /* WAIT_TIMEOUT: nobody else can signal it */
-        h2_guest_stop(H2_STOP_UNIMPLEMENTED_IMPORT,
-                      "WaitForSingleObject(INFINITE) on an unsignalled event with a single guest thread: would never return");
-    }
-    h2_guest_stop(H2_STOP_UNIMPLEMENTED_IMPORT, "WaitForSingleObject on object type %d", (int)o->type);
+    H2Object *o = h2_handle_get(ARG(0), H2_OBJ_MUTEX);
+    if (!o || o->u.sync.count == 0 || o->u.sync.owner != (int)h2_thread_tid()) { g_h2_last_error = 288; return 0; }   /* ERROR_NOT_OWNER */
+    if (--o->u.sync.count == 0) o->u.sync.owner = 0;
+    return 1;
 }
 
 static uint32_t k_CloseHandle(CPU *c, const uint32_t *args)
@@ -125,6 +151,7 @@ static uint32_t k_CloseHandle(CPU *c, const uint32_t *args)
 static const H2ImportDef k_defs[] = {
 #define K(name, n) { "KERNEL32.dll", #name, n, k_##name }
     K(CreateMutexA, 3), K(CreateEventA, 4), K(SetEvent, 1), K(ResetEvent, 1), K(WaitForSingleObject, 2), K(CloseHandle, 1),
+    K(WaitForMultipleObjects, 4), K(ReleaseMutex, 1),
 #undef K
 };
 

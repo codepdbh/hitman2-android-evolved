@@ -86,7 +86,7 @@ static const H2GLBackend *be(void) { return g_be ? g_be : (g_be = h2_gl_null_bac
 
 void h2_gl_set_backend(const H2GLBackend *b) { g_be = b; }
 void h2_gl_set_frame_hook(H2GLFrameHook hook) { g_frame_hook = hook; }
-void h2_gl_get_stats(H2GLStats *out) { *out = g_stats; unsigned n = 0; for (int i = 0; i < H2GL_MAX_TEXTURES; i++) n += g_tex[i].used; out->textures_live = n; }
+void h2_gl_get_stats(H2GLStats *out) { *out = g_stats; unsigned n = 0; for (int i = 1; i < H2GL_MAX_TEXTURES; i++) n += g_tex[i].used;   /* name 0, the default texture, is not counted */ out->textures_live = n; }
 const H2GLState *h2_gl_state(void) { return &g_s; }
 
 static void state_defaults(void)
@@ -469,7 +469,7 @@ static uint32_t gl_TexImage2D(CPU *c, const uint32_t *args)
     if (level < 0 || level > 12 || ARG(5) != 0 || !is_pot(w) || !is_pot(h) || w > maxs || h > maxs) {
         set_error(GL_INVALID_VALUE, "glTexImage2D: size must be a power of two <= max, no border"); return 0;
     }
-    if (!tex) { set_error(GL_INVALID_OPERATION, "glTexImage2D: no texture bound"); return 0; }
+    /* texture name 0 is the default texture object of GL 1.1: valid to specify and parameterise */
     if (ARG(8) && !pixel_bytes(ARG(6), ARG(7))) { set_error(GL_INVALID_ENUM, "glTexImage2D: format/type combination"); return 0; }
     uint8_t *rgba = scratch((size_t)w * (size_t)h * 4);
     if (ARG(8)) to_rgba8(ARG(6), ARG(7), w, h, ARG(8), internal_has_alpha(ARG(2)), rgba);
@@ -486,7 +486,7 @@ static uint32_t gl_TexSubImage2D(CPU *c, const uint32_t *args)
     int level = (int32_t)ARG(1), x = (int32_t)ARG(2), y = (int32_t)ARG(3), w = (int32_t)ARG(4), h = (int32_t)ARG(5);
     uint32_t tex = g_s.tex[g_active_unit].bound;
     if (ARG(0) != GL_TEXTURE_2D) { set_error(GL_INVALID_ENUM, "glTexSubImage2D target"); return 0; }
-    if (!tex || !g_tex[tex].w) { set_error(GL_INVALID_OPERATION, "glTexSubImage2D: no image"); return 0; }
+    if (!g_tex[tex].w) { set_error(GL_INVALID_OPERATION, "glTexSubImage2D: no image"); return 0; }
     if (level != 0 || x < 0 || y < 0 || w < 0 || h < 0 || x + w > g_tex[tex].w || y + h > g_tex[tex].h) { set_error(GL_INVALID_VALUE, "glTexSubImage2D: region"); return 0; }
     if (!w || !h) return 0;
     if (!ARG(8) || !pixel_bytes(ARG(6), ARG(7))) { set_error(GL_INVALID_ENUM, "glTexSubImage2D: format/type/pixels"); return 0; }
@@ -502,7 +502,6 @@ static uint32_t gl_TexParameteri(CPU *c, const uint32_t *args)
     uint32_t tex = g_s.tex[g_active_unit].bound;
     if (ARG(0) != GL_TEXTURE_2D) { set_error(GL_INVALID_ENUM, "glTexParameteri target"); return 0; }
     if (ARG(1) < 0x2800 || ARG(1) > 0x2803) { set_error(GL_INVALID_ENUM, "glTexParameteri pname"); return 0; }
-    if (!tex) { set_error(GL_INVALID_OPERATION, "glTexParameteri: no texture bound"); return 0; }
     be()->tex_param(tex, ARG(1), ARG(2));
     return 0;
 }

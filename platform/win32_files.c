@@ -23,6 +23,7 @@
 #include <ctype.h>
 #include <errno.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 
@@ -342,8 +343,155 @@ static uint32_t k_DeleteFileA(CPU *c, const uint32_t *args)
     return 1;
 }
 
+/* ---- directory search: FindFirstFileA / FindNextFileA / FindClose ----
+ * The search covers the union of the user root and the read-only install (user entries win), like every other
+ * path in this layer. The whole matching list is captured at FindFirstFileA time. Not provided: 8.3 short
+ * names (cAlternateFileName is empty), file attributes other than DIRECTORY / NORMAL, search levels other than
+ * the plain one. */
+typedef struct { char name[260]; int is_dir; uint64_t size, mtime_unix; } FindEntry;
+typedef struct { unsigned n, i; FindEntry e[1]; } FindState;     /* e[] is over-allocated */
+
+static unsigned list_dir(const char *dir, FindEntry *out, unsigned cap)
+{
+    unsigned n = 0;
+    char path[1000];
+#if defined(_WIN32)
+    struct _finddata_t fd; intptr_t h;
+    snprintf(path, sizeof path, "%s/*", dir);
+    h = _findfirst(path, &fd);
+    if (h == -1) return 0;
+    do {
+        if (!strcmp(fd.name, ".") || !strcmp(fd.name, "..") || n >= cap) continue;
+        snprintf(out[n].name, sizeof out[n].name, "%s", fd.name);
+        out[n].is_dir = (fd.attrib & _A_SUBDIR) != 0; out[n].size = fd.size; out[n].mtime_unix = (uint64_t)fd.time_write; n++;
+    } while (_findnext(h, &fd) == 0);
+    _findclose(h);
+#else
+    DIR *d = opendir(dir);
+    struct dirent *de;
+    if (!d) return 0;
+    while ((de = readdir(d)) != 0 && n < cap) {
+        struct stat st;
+        if (!strcmp(de->d_name, ".") || !strcmp(de->d_name, "..")) continue;
+        snprintf(path, sizeof path, "%s/%s", dir, de->d_name);
+        if (stat(path, &st) != 0) continue;
+        snprintf(out[n].name, sizeof out[n].name, "%s", de->d_name);
+        out[n].is_dir = S_ISDIR(st.st_mode) != 0; out[n].size = (uint64_t)st.st_size; out[n].mtime_unix = (uint64_t)st.st_mtime; n++;
+    }
+    closedir(d);
+#endif
+    return n;
+}
+
+static int ci_eq(const char *a, const char *b)
+{
+    for (; *a && *b; a++, b++) if (tolower((unsigned char)*a) != tolower((unsigned char)*b)) return 0;
+    return *a == *b;
+}
+
+/* Windows wildcard match: '*' and '?', case-insensitive; "*.*" matches every name (with or without a dot). */
+static int wild(const char *p, const char *s)
+{
+    if (!strcmp(p, "*.*")) return 1;
+    while (*p) {
+        if (*p == '*') {
+            while (*p == '*') p++;
+            if (!*p) return 1;
+            for (; *s; s++) if (wild(p, s)) return 1;
+            return 0;
+        }
+        if (!*s || (*p != '?' && tolower((unsigned char)*p) != tolower((unsigned char)*s))) return 0;
+        p++; s++;
+    }
+    return *s == 0;
+}
+
+static void fill_find_data(uint32_t out, const FindEntry *e)
+{
+    memset(guest_ptr(out), 0, 320);
+    wr32(out, e->is_dir ? 0x10u : 0x80u);
+    uint64_t ft = (e->mtime_unix + 11644473600ull) * 10000000ull;
+    for (int i = 0; i < 3; i++) { wr32(out + 4 + 8u * (uint32_t)i, (uint32_t)ft); wr32(out + 8 + 8u * (uint32_t)i, (uint32_t)(ft >> 32)); }
+    wr32(out + 28, (uint32_t)(e->size >> 32)); wr32(out + 32, (uint32_t)e->size);
+    strncpy((char *)guest_ptr(out + 44), e->name, 259);
+}
+
+static void find_close(H2Object *o) { free(o->u.find.state); o->u.find.state = 0; }
+
+static uint32_t k_FindFirstFileA(CPU *c, const uint32_t *args)
+{
+    UNUSED;
+    const char *guest = (const char *)guest_ptr(ARG(0));
+    char dirpart[520], rel[520], pat[260], host[920];
+    const char *sep1 = strrchr(guest, '\\'), *sep2 = strrchr(guest, '/'), *sep = sep1 > sep2 ? sep1 : sep2;
+    if (sep) { size_t n = (size_t)(sep - guest); if (n >= sizeof dirpart) n = sizeof dirpart - 1; memcpy(dirpart, guest, n); dirpart[n] = 0; snprintf(pat, sizeof pat, "%s", sep + 1); }
+    else { dirpart[0] = 0; snprintf(pat, sizeof pat, "%s", guest); }
+    if (!sep && strchr(guest, ':')) { g_h2_last_error = ERR_PATH_NOT_FOUND; return INVALID_HANDLE; }
+    if (guest_to_rel(dirpart[0] ? dirpart : ".", rel, sizeof rel) != 0) { g_h2_last_error = ERR_PATH_NOT_FOUND; return INVALID_HANDLE; }
+    enum { CAP = 4096 };
+    FindEntry *all = (FindEntry *)malloc(sizeof(FindEntry) * CAP);
+    if (!all) { g_h2_last_error = 8; return INVALID_HANDLE; }
+    unsigned n = 0, nu = 0;
+    int dir_found = 0;
+    if (resolve(g_user_root, rel, host, sizeof host)) { n = list_dir(host, all, CAP); nu = n; dir_found = 1; }
+    if (resolve(g_game_root, rel, host, sizeof host)) {
+        FindEntry *g = (FindEntry *)malloc(sizeof(FindEntry) * CAP);
+        if (g) {
+            unsigned ng = list_dir(host, g, CAP);
+            for (unsigned i = 0; i < ng && n < CAP; i++) {
+                int dup = 0;
+                for (unsigned j = 0; j < nu; j++) if (ci_eq(all[j].name, g[i].name)) { dup = 1; break; }
+                if (!dup) all[n++] = g[i];
+            }
+            free(g); dir_found = 1;
+        }
+    }
+    if (!dir_found) { free(all); g_h2_last_error = ERR_PATH_NOT_FOUND; return INVALID_HANDLE; }
+    FindState *st = (FindState *)malloc(sizeof(FindState) + sizeof(FindEntry) * (n ? n : 1));
+    if (!st) { free(all); g_h2_last_error = 8; return INVALID_HANDLE; }
+    st->n = 0; st->i = 0;
+    if (rel[0]) {                                              /* sub-directories list "." and ".." first, as Windows does */
+        FindEntry dots = { "", 1, 0, 0 };
+        if (wild(pat, ".")) { strcpy(dots.name, "."); st->e[st->n++] = dots; }
+        if (wild(pat, "..")) { strcpy(dots.name, ".."); st->e[st->n++] = dots; }
+    }
+    for (unsigned i = 0; i < n; i++) if (wild(pat, all[i].name)) st->e[st->n++] = all[i];
+    free(all);
+    if (st->n == 0) { free(st); g_h2_last_error = ERR_FILE_NOT_FOUND; return INVALID_HANDLE; }
+    H2Object *o; uint32_t h = h2_handle_new(H2_OBJ_FIND, &o);
+    if (!h) { free(st); g_h2_last_error = 8; return INVALID_HANDLE; }
+    o->u.find.state = st; o->close = find_close;
+    st->i = 1;
+    fill_find_data(ARG(1), &st->e[0]);
+    H2_INFO(H2_LOG_FILESYSTEM, "FindFirstFileA(\"%s\") -> %u entries", guest, st->n);
+    g_h2_last_error = 0;
+    return h;
+}
+
+static uint32_t k_FindNextFileA(CPU *c, const uint32_t *args)
+{
+    UNUSED;
+    H2Object *o = h2_handle_get(ARG(0), H2_OBJ_FIND);
+    if (!o) { g_h2_last_error = ERR_INVALID_HANDLE; return 0; }
+    FindState *st = (FindState *)o->u.find.state;
+    if (st->i >= st->n) { g_h2_last_error = 18; return 0; }   /* ERROR_NO_MORE_FILES */
+    fill_find_data(ARG(1), &st->e[st->i++]);
+    return 1;
+}
+
+static uint32_t k_FindClose(CPU *c, const uint32_t *args)
+{
+    UNUSED;
+    H2Object *o = h2_handle_get(ARG(0), H2_OBJ_FIND);
+    if (!o) { g_h2_last_error = ERR_INVALID_HANDLE; return 0; }
+    if (o->close) o->close(o);
+    o->type = H2_OBJ_FREE;
+    return 1;
+}
+
 static const H2ImportDef k_defs[] = {
 #define K(name, n) { "KERNEL32.dll", #name, n, k_##name }
+    K(FindFirstFileA, 2), K(FindNextFileA, 2), K(FindClose, 1),
     K(DeleteFileA, 1), K(CreateFileA, 7), K(ReadFile, 5), K(WriteFile, 5), K(SetFilePointer, 4), K(GetFileSize, 2), K(FlushFileBuffers, 1),
     K(GetCurrentDirectoryA, 2), K(SetCurrentDirectoryA, 1),
 #undef K

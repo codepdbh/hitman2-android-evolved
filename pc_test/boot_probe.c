@@ -44,6 +44,7 @@ static const char *reason_name(h2_stop_reason r)
 
 static void on_stop(h2_stop_reason why, const char *message)
 {
+    h2_threads_forward_stop(why, message);                 /* from a secondary guest thread: hands the stop to the main thread */
     g_reason = why;
     snprintf(g_message, sizeof g_message, "%s", message);
     longjmp(g_stop_jmp, 1);
@@ -80,7 +81,7 @@ static int run_guarded(CPU *c, uint32_t entry)
 static void platform_init(void) { SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX); }
 #else
 #include <signal.h>
-static sigjmp_buf g_fault_jmp;
+static _Thread_local sigjmp_buf g_fault_jmp;
 static void on_signal(int sig, siginfo_t *si, void *ctx)
 {
     (void)ctx;
@@ -102,6 +103,12 @@ static void platform_init(void)
     sigaction(SIGSEGV, &sa, 0); sigaction(SIGBUS, &sa, 0); sigaction(SIGFPE, &sa, 0);
 }
 #endif
+
+/* Entry of every secondary guest thread: same fault guard as the main thread. */
+static void thread_runner(CPU *c, uint32_t entry)
+{
+    if (run_guarded(c, entry)) h2_threads_forward_stop(H2_STOP_FAULT, g_message);
+}
 
 int main(int argc, char **argv)
 {
@@ -128,6 +135,8 @@ int main(int argc, char **argv)
     if (guest_mem_init() != 0) { fprintf(stderr, "cannot reserve the guest address space\n"); return 3; }
     h2_register_kernel32();
     h2_register_objects();
+    h2_register_threads();
+    h2_threads_set_runner(thread_runner);
     h2_register_files();
     h2_register_user32();
     h2_register_game_dlls();

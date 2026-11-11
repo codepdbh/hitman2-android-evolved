@@ -1,0 +1,346 @@
+﻿FILESYSTEM I guest C:\Hitman2 = [user] <HOME>\Documents\H2-AndroidEvolved\build\boot\user + [game, read-only] <HOME>\Documents\H2-AndroidEvolved\Hitman 2 Silent Assassin
+FILESYSTEM I loaded hitman2.exe base=00400000 size=00366000 entry=0059F54E sections=7 import slots=151
+image <HOME>\Documents\H2-AndroidEvolved\Hitman 2 Silent Assassin\hitman2.exe: base=00400000 entry=0059F54E, 151 distinct imports bound, 123 implemented
+lifted functions linked: 23307; entry has a lifted body: yes
+WIN32      I GetProcAddress(kernel32.dll, "IsProcessorFeaturePresent")
+WIN32      I RegisterClassEx "ZSYSTEMCLASS  0" wndproc=00418030
+WIN32      I CreateWindowEx class="ZSYSTEMCLASS  0" title="" 640x480 at (80,-15) style=86000000 -> hwnd 10100
+INPUT      I DirectInput 8 created (version 0800)
+INPUT      I DirectInput device created: mouse
+INPUT      I DirectInput device created: keyboard
+WIN32      I window title: ""
+FILESYSTEM I open "hitman2.ini" (read, user root) -> handle 104
+WIN32      I RegOpenKeyEx HKLM\SOFTWARE\EIDOS INTERACTIVE -> not found
+FILESYSTEM I open "writetest" (write, user root) -> handle 104
+FILESYSTEM I deleted "writetest" (user root)
+WIN32      I window title: ""
+FILESYSTEM I open "hitman2.ini" (read, user root) -> handle 104
+FILESYSTEM I open "hitman2.ini" (read, user root) -> handle 104
+FILESYSTEM I loaded RenderOpenGL.dll base=10000000 size=0013B000 entry=100336B6 sections=4 import slots=184 (DLL)
+WIN32      I LoadLibraryA("RenderOpenGL.dll") -> DllMain(10000000, DLL_PROCESS_ATTACH)
+WIN32      I GetProcAddress(kernel32.dll, "IsProcessorFeaturePresent")
+WIN32      I GetProcAddress(RenderOpenGL.dll, "Create") -> 10001000
+WIN32      I window title: "Hitman2"
+GRAPHICS   I pixel format 1: 32-bit colour, 24-bit depth, 8-bit stencil
+GRAPHICS   I GL context current, backend 'null (headless)', surface 800x450
+GRAPHICS   I wglGetProcAddress("glActiveTextureARB")
+GRAPHICS   I wglGetProcAddress("glClientActiveTextureARB")
+GRAPHICS   I wglGetProcAddress("glMultiTexCoord2fvARB")
+GRAPHICS   I wglGetProcAddress("glMultiTexCoord4fvARB")
+GRAPHICS   I wglGetProcAddress("glBlendEquationEXT")
+AUDIO      I DirectSoundEnumerateA: offering the virtual output device
+AUDIO      I IDirectSound8 created (null sink with a real clock; no EAX effects)
+AUDIO      I CreateSoundBuffer: primary 0 bytes, 44100 Hz, 2 ch, 16 bit, flags 00000091
+AUDIO      I primary buffer format: 44100 Hz, 2 ch, 16 bit
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      I CreateSoundBuffer: secondary 32 bytes, 22050 Hz, 1 ch, 16 bit, flags 000300B4
+AUDIO      W IDirectSoundBuffer8::QueryInterface: 31EFAC30-... is not supported (property set / EAX are not implemented)
+WIN32      W LoadLibraryA("DieselPowerImplementation.dll") -> not found
+AUDIO      I DirectSoundEnumerateA: offering the virtual output device
+AUDIO      I IDirectSound8 created (null sink with a real clock; no EAX effects)
+AUDIO      I CreateSoundBuffer: primary 0 bytes, 44100 Hz, 2 ch, 16 bit, flags 00000091
+AUDIO      I primary buffer format: 44100 Hz, 2 ch, 16 bit
+WIN32      I CreateThread: guest thread 0108 starts at 005F5F40 (param 2080F7E0); runs when the creator blocks
+WIN32      I CreateThread: guest thread 010C starts at 005E69B0 (param 207DFC40); runs when the creator blocks
+FILESYSTEM I FindFirstFileA("SCENES\AllLevels\Logos.ZIP") -> 1 entries
+FILESYSTEM I open "SCENES/AllLevels/Logos.ZIP" (read, game root) -> handle 124
+FILESYSTEM I open "Keyboard.cfg" (read, game root) -> handle 124
+FILESYSTEM I open "Keyboard.cfg" (read, game root) -> handle 124
+FILESYSTEM W CreateFileA("SCENES\AllLevels\Logos.loc") -> not found
+FILESYSTEM W CreateFileA("SCENES\AllLevels\Logos.anm") -> not found
+FILESYSTEM I open "SCENES/AllLevels/Logos.whd" (read, game root) -> handle 124
+FILESYSTEM I open "SCENES/AllLevels/Logos.wav" (read, game root) -> handle 124
+FILESYSTEM I open "streams.wav" (read, game root) -> handle 124
+FILESYSTEM I open "SCENES/AllLevels/Logos.whd" (read, game root) -> handle 128
+FILESYSTEM I open "SCENES/AllLevels/Logos.wav" (read, game root) -> handle 128
+GAME       I guest stopped: 300 frames presented
+
+stopped: requested
+  300 frames presented
+  cpu: eax=00000000 ecx=00020100 edx=1003C420 ebx=00000000 esp=0FEFEB24 ebp=00F8F8F8 esi=20576630 edi=20528F10
+  esp=0FEFEB24 (inside the guest stack)  guest stack, probable return addresses (nearest first): 10003855 1000CD26 00421F1A 004170CD 004163C2 00416516 0041656C 0040266F 005A41D1 005A424E 004026F0 0059F61C
+  last dispatch targets (oldest first): 10010200 1001E5C0 10001860 1000C9A0 100305A0 1002F970 100305E0 00422040 00425B80 00425B10 0046F2D0 1002F970 100305E0 10001860 FE001000(OPENGL32.dll!glFinish) FE000DB0(GDI32.dll!SwapBuffers)
+  GL: frames=300 draw_calls=31 triangles=62 clears=270 tex_uploads=80 (3015688 bytes) textures_live=20 gl_errors=0
+  imports called: 154 distinct, 40645 calls
+           4  KERNEL32.dll!HeapFree
+           6  KERNEL32.dll!ReadFile
+           2  KERNEL32.dll!LoadLibraryA
+          24  KERNEL32.dll!HeapAlloc
+           4  KERNEL32.dll!GetFileSize
+           1  KERNEL32.dll!DeleteFileA
+           1  KERNEL32.dll!WriteFile
+           4  KERNEL32.dll!Sleep
+         820  KERNEL32.dll!WaitForSingleObject
+           6  KERNEL32.dll!CreateEventA
+           3  KERNEL32.dll!SetFilePointer
+           3  KERNEL32.dll!GetProcAddress
+         275  KERNEL32.dll!GetSystemTimeAsFileTime
+         275  KERNEL32.dll!QueryPerformanceCounter
+           1  KERNEL32.dll!QueryPerformanceFrequency
+           1  KERNEL32.dll!InitializeCriticalSection
+        9002  KERNEL32.dll!LeaveCriticalSection
+        9002  KERNEL32.dll!EnterCriticalSection
+           1  KERNEL32.dll!FindClose
+           3  KERNEL32.dll!GetModuleHandleA
+           3  KERNEL32.dll!GetStartupInfoA
+           2  KERNEL32.dll!GetCommandLineA
+           2  KERNEL32.dll!GetVersion
+           2  KERNEL32.dll!GetVersionExA
+           2  KERNEL32.dll!HeapCreate
+          78  KERNEL32.dll!HeapReAlloc
+           2  KERNEL32.dll!SetHandleCount
+           6  KERNEL32.dll!GetStdHandle
+           8  KERNEL32.dll!GetFileType
+         421  KERNEL32.dll!HeapSize
+           2  KERNEL32.dll!FreeEnvironmentStringsW
+           8  KERNEL32.dll!WideCharToMultiByte
+           2  KERNEL32.dll!SetErrorMode
+           2  KERNEL32.dll!GetEnvironmentStringsW
+           2  KERNEL32.dll!SetUnhandledExceptionFilter
+          12  KERNEL32.dll!MultiByteToWideChar
+           4  KERNEL32.dll!GetStringTypeW
+           4  KERNEL32.dll!GetCPInfo
+           2  KERNEL32.dll!GetACP
+          10  KERNEL32.dll!LCMapStringW
+           1  KERNEL32.dll!CreateMutexA
+           1  KERNEL32.dll!GetLastError
+           5  KERNEL32.dll!GetModuleFileNameA
+          14  KERNEL32.dll!CreateFileA
+          21  KERNEL32.dll!CloseHandle
+           1  KERNEL32.dll!FindFirstFileA
+           2  KERNEL32.dll!SetThreadPriority
+           1  KERNEL32.dll!SetThreadPriorityBoost
+           2  KERNEL32.dll!CreateThread
+           3  KERNEL32.dll!ResetEvent
+           3  KERNEL32.dll!SetEvent
+           1  DINPUT8.dll!DirectInput8Create
+           2  ADVAPI32.dll!RegOpenKeyExA
+           1  GDI32.dll!GetStockObject
+           3  USER32.dll!SetWindowTextA
+           3  USER32.dll!SetWindowLongA
+           1  USER32.dll!LoadCursorA
+           6  USER32.dll!GetSystemMetrics
+           2  USER32.dll!GetClassInfoExA
+           1  USER32.dll!FindWindowA
+           1  USER32.dll!ShowWindow
+           3  USER32.dll!SystemParametersInfoA
+           1  USER32.dll!PostMessageA
+           1  USER32.dll!CreateWindowExA
+           1  USER32.dll!RegisterClassExA
+          10  USER32.dll!DefWindowProcA
+         270  USER32.dll!PeekMessageA
+           1  USER32.dll!RegisterWindowMessageA
+           1  P5DLL.dll!??0CP5DLL@@QAE@XZ
+           2  EAX.DLL!#6
+           2  DSOUND.dll!#2
+           2  kernel32.dll!IsProcessorFeaturePresent
+           2  DINPUT8.dll#IDirectInput8A!CreateDevice
+           1  DINPUT8.dll#IDirectInput8A!EnumDevices
+           1  DINPUT8.dll#IDirectInputDevice8!SetProperty
+           3  DINPUT8.dll#IDirectInputDevice8!Acquire
+         269  DINPUT8.dll#IDirectInputDevice8!GetDeviceState
+         269  DINPUT8.dll#IDirectInputDevice8!GetDeviceData
+           2  DINPUT8.dll#IDirectInputDevice8!SetDataFormat
+           2  DINPUT8.dll#IDirectInputDevice8!SetCooperativeLevel
+           1  USER32.dll!ReleaseDC
+           1  USER32.dll!EnumDisplaySettingsA
+           6  USER32.dll!GetClientRect
+           1  USER32.dll!GetWindowDC
+           1  USER32.dll!GetDC
+           1  USER32.dll!GetDesktopWindow
+           1  USER32.dll!GetCursor
+           1  USER32.dll!SetCursorPos
+           8  USER32.dll!ClientToScreen
+           3  USER32.dll!SetCursor
+           3  USER32.dll!SetFocus
+           1  USER32.dll!GetWindowRect
+           1  USER32.dll!AdjustWindowRectEx
+           4  USER32.dll!ClipCursor
+           1  USER32.dll!SetForegroundWindow
+           1  USER32.dll!MoveWindow
+           1  GDI32.dll!GetPixelFormat
+         300  GDI32.dll!SwapBuffers
+           1  GDI32.dll!SetDeviceGammaRamp
+           1  GDI32.dll!SetPixelFormat
+           7  GDI32.dll!DescribePixelFormat
+           2  GDI32.dll!GetDeviceCaps
+         538  OPENGL32.dll!glPolygonMode
+          62  OPENGL32.dll!glColor4f
+         124  OPENGL32.dll!glVertex3f
+          80  OPENGL32.dll!glTexImage2D
+          20  OPENGL32.dll!glGenTextures
+          31  OPENGL32.dll!glBegin
+          31  OPENGL32.dll!glEnd
+         269  OPENGL32.dll!glFrustum
+         270  OPENGL32.dll!glClearColor
+         270  OPENGL32.dll!glClear
+         300  OPENGL32.dll!glViewport
+         269  OPENGL32.dll!glScissor
+          31  OPENGL32.dll!glOrtho
+          20  OPENGL32.dll!glPixelStorei
+         300  OPENGL32.dll!glFinish
+           1  OPENGL32.dll!wglCreateContext
+           1  OPENGL32.dll!wglMakeCurrent
+           1  OPENGL32.dll!glShadeModel
+           1  OPENGL32.dll!glDrawBuffer
+           1  OPENGL32.dll!glCullFace
+           1  OPENGL32.dll!glFogi
+         602  OPENGL32.dll!glMatrixMode
+         602  OPENGL32.dll!glLoadIdentity
+         600  OPENGL32.dll!glBlendFunc
+        2370  OPENGL32.dll!glEnable
+        4253  OPENGL32.dll!glDisable
+         300  OPENGL32.dll!glAlphaFunc
+         300  OPENGL32.dll!glDepthFunc
+         300  OPENGL32.dll!glDepthMask
+         600  OPENGL32.dll!glColor4ub
+         620  OPENGL32.dll!glBindTexture
+         600  OPENGL32.dll!glTexEnvf
+         569  OPENGL32.dll!glFogfv
+        1138  OPENGL32.dll!glFogf
+        1778  OPENGL32.dll!glTexParameteri
+           5  OPENGL32.dll!wglGetProcAddress
+           1  OPENGL32.dll!glGetIntegerv
+           9  OPENGL32.dll!glGetString
+         269  OPENGL32.dll!glLightModelfv
+         269  OPENGL32.dll!glColorMaterial
+           1  KERNEL32.dll!DisableThreadLibraryCalls
+         901  OPENGL32.dll!glActiveTextureARB
+           1  DSOUND.dll#IDirectSound8!Release
+         131  DSOUND.dll#IDirectSound8!CreateSoundBuffer
+           2  DSOUND.dll#IDirectSound8!GetCaps
+           2  DSOUND.dll#IDirectSound8!SetCooperativeLevel
+         131  DSOUND.dll#IDirectSoundBuffer8!QueryInterface
+         130  DSOUND.dll#IDirectSoundBuffer8!Release
+           2  DSOUND.dll#IDirectSoundBuffer8!Play
+           2  DSOUND.dll#IDirectSoundBuffer8!SetFormat
+         130  DSOUND.dll#IDirectSoundBuffer8!Stop
+         129  DSOUND.dll#IDirectSound3DBuffer!Release
+RESULT reason=requested dispatches=1930966 imports_called=154 import_calls=40645 implemented=123 bound=151

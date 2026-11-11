@@ -242,9 +242,11 @@ static uint32_t k_InitializeCriticalSection(CPU *c, const uint32_t *args)
 }
 static uint32_t k_EnterCriticalSection(CPU *c, const uint32_t *args)
 {
-    UNUSED;
+    uint32_t me = h2_thread_tid();
+    while (rd32(ARG(0) + 12) != 0 && rd32(ARG(0) + 12) != me)          /* owned by another guest thread: let it run */
+        h2_thread_block_on_cs(c, ARG(0));
     wr32(ARG(0) + 4, rd32(ARG(0) + 4) + 1); wr32(ARG(0) + 8, rd32(ARG(0) + 8) + 1);
-    wr32(ARG(0) + 12, rd32(H2_TIB_ADDR + 0x24));                       /* OwningThread */
+    wr32(ARG(0) + 12, me);                                             /* OwningThread */
     return 0;
 }
 static uint32_t k_LeaveCriticalSection(CPU *c, const uint32_t *args)
@@ -586,21 +588,6 @@ static uint32_t k_IsProcessorFeaturePresent(CPU *c, const uint32_t *args)
     }
 }
 
-static uint32_t k_Sleep(CPU *c, const uint32_t *args)
-{
-    UNUSED;
-    if (ARG(0)) {                                                      /* Sleep(0) only yields; one guest thread, nothing to yield to */
-        struct timespec ts = { (time_t)(ARG(0) / 1000u), (long)(ARG(0) % 1000u) * 1000000L };
-#if defined(_WIN32)
-        extern void __stdcall Sleep(unsigned long);
-        (void)ts; Sleep(ARG(0));
-#else
-        nanosleep(&ts, 0);
-#endif
-    }
-    return 0;
-}
-
 /* Thread attach/detach notifications are never sent (one guest thread), so there is nothing to disable. */
 static uint32_t k_DisableThreadLibraryCalls(CPU *c, const uint32_t *args)
 {
@@ -657,7 +644,7 @@ static const H2ImportDef k_defs[] = {
 #define K(name, n) { "KERNEL32.dll", #name, n, k_##name }
     K(GetSystemTimeAsFileTime, 1), K(GetSystemTime, 1), K(GetTimeZoneInformation, 1), K(FileTimeToSystemTime, 2),
     K(FileTimeToLocalFileTime, 2), K(LoadLibraryA, 1), K(FreeLibrary, 1), K(GetProcAddress, 2),
-    K(IsBadReadPtr, 2), K(IsBadCodePtr, 1), K(Sleep, 1),
+    K(IsBadReadPtr, 2), K(IsBadCodePtr, 1),
     { "kernel32.dll", "IsProcessorFeaturePresent", 1, k_IsProcessorFeaturePresent },
     K(GetVersion, 0), K(GetVersionExA, 1), K(GetCommandLineA, 0), K(GetCurrentProcess, 0), K(GetCurrentThread, 0),
     K(GetLastError, 0), K(GetStartupInfoA, 1), K(GetModuleFileNameA, 3),

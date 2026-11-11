@@ -29,6 +29,7 @@ Runs at low priority with a bounded number of worker processes (worksafe).
 from __future__ import annotations
 
 import argparse
+import bisect
 import collections
 import concurrent.futures as cf
 import json
@@ -130,6 +131,26 @@ def lift_module(module: str) -> dict:
     with cf.ProcessPoolExecutor(max_workers=workers) as ex:
         for idx, ok, err, td, tf, tg, nl in ex.map(_lift_chunk, jobs):
             lifted += ok; errors.update(err); todos.update(td); todo_funcs += tf; targets |= tg; lines += nl
+    # Gap closing: a lifted function may branch (a tail `dispatch`) to an address inside code the catalog did not
+    # give its own entry. Lift each such target as an extra entry, sized up to the next catalog entry (at most 4 KiB),
+    # and repeat for the targets those introduce. These entries are code reached by real branches of lifted code,
+    # not guesses; a target that fails to lift stays missing and is reported in the census.
+    gap_entries = []
+    starts = sorted(a for a, _ in funcs)
+    for _round in range(6):
+        missing_now = sorted(t for t in targets - set(lifted) if t not in errors)
+        if not missing_now: break
+        ents = []
+        for a in missing_now:
+            i = bisect.bisect_right(starts, a)
+            nxt = starts[i] if i < len(starts) else a + 0x400
+            ents.append((a, max(16, min(nxt - a, 0x1000))))
+        jobs2 = [(module, len(jobs) + j, ents[k:k + CHUNK]) for j, k in enumerate(range(0, len(ents), CHUNK))]
+        jobs += jobs2
+        gap_entries += [a for a, _ in ents]
+        with cf.ProcessPoolExecutor(max_workers=workers) as ex:
+            for idx, ok, err, td, tf, tg, nl in ex.map(_lift_chunk, jobs2):
+                lifted += ok; errors.update(err); todos.update(td); todo_funcs += tf; targets |= tg; lines += nl
     lifted.sort()
     (gd / "funcs_list.h").write_text(
         "/* GENERATED */\n#define LIFTED_FUNCS(X) \\\n" + " \\\n".join(f"    X({a:08X})" for a in lifted) + "\n",
@@ -141,6 +162,7 @@ def lift_module(module: str) -> dict:
         "catalog_entries": len(funcs), "lifted": len(lifted), "lifter_exceptions": len(errors),
         "lifter_exception_kinds": dict(err_kinds.most_common(20)),
         "lifter_exception_addresses": [f"{a:#010x}" for a in sorted(errors)][:200],
+        "gap_entries_added": len(gap_entries),
         "c_lines": lines, "chunks": len(jobs),
         "functions_containing_RECOMP_TODO": todo_funcs,
         "RECOMP_TODO_total": sum(todos.values()), "RECOMP_TODO_by_mnemonic": dict(todos.most_common()),
