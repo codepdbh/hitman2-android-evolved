@@ -52,6 +52,14 @@ nulo), no hay audio, ni lectura de escenas, ni controles táctiles: no es jugabl
 - Arranque directo a una escena para pruebas: `adb shell am start -n com.h2ae.android/.GameActivity --es scene MainMenu.gms`
   (reescribe `DefaultScene` en el ini del perfil; solo si la actividad no estaba ya abierta).
 - Limitación: si el sistema destruye la superficie (pantalla apagada, app en segundo plano) el juego se detiene y no se reanuda.
+- **HUD rediseñado (2026-11-11, tercera tanda):** por defecto solo 6 botones en misión (disparo, acción, agacharse, correr,
+  inventario, pausa) + joystick + «⋯» (el resto va al panel) + ⚙; en logos/introducción un botón rotulado **SALTAR ▶▶** (Esc +
+  clic); en menús cruceta, aceptar, atrás y ⚙. El ⚙ abre los ajustes: elegir qué botones quedan en pantalla, mover arrastrando,
+  tamaño, transparencia, ocultar el panel y restaurar (guardado en SharedPreferences). No se reasignan las teclas: son las del
+  `keyboard.cfg` del juego. Comprobado en el S25: SALTAR visible y funcional en la introducción, menú principal con cruceta/ajustes;
+  **sin comprobar**: el arrastre de botones, los diálogos de ajustes, ni el HUD de misión (no se ha llegado a una misión).
+- Menú principal alcanzado en el teléfono (pantalla de opciones del juego, en español) tras saltar la introducción. Una parada en
+  `0059EAF4` (salto indirecto del `memcpy` sin cuerpo) se cerró con `config/lift_extra_entries.json`.
 - Nuevo: DirectSound 8 (`platform/dsound.c`: dispositivo, búfer primario/secundarios, 3D listener/buffer con parámetros
   guardados; sumidero nulo con reloj real, sin mezclador ni salida audible; EAX/IKsPropertySet y efectos devuelven
   `E_NOINTERFACE`), hilos de invitado cooperativos (`platform/win32_threads.c`: `CreateThread`, `Sleep`, `Wait*`, secciones

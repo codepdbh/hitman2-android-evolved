@@ -1,0 +1,6 @@
+{
+  "_comment": "Extra function entries for scripts/lift_image.py: code addresses that lifted code reaches through an indirect jump (jump table) the lifter could not resolve statically. Each was observed at run time as a stop 'no lifted body for guest X' and is code inside the module's own .text, not a guess. Add the address, re-lift, re-run.",
+  "hitman2": {
+    "0x0059EAF4": "memcpy/memmove tail: indirect jump from 0x59EB07 (jmp [edx*4+0x59EB10]) reached it with no body; observed when the main menu 'Opciones' screen ran (stop at 0059EAF4, return address on the guest stack)."
+  }
+}

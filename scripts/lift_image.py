@@ -119,6 +119,18 @@ def lift_module(module: str) -> dict:
             raise SystemExit(f"missing {need}")
     cat = json.loads(catalog.read_text(encoding="utf-8"))["functions"]
     funcs = sorted((f["address"], f["size"]) for f in cat if f["size"] > 0)
+    # Run-time discovered indirect targets (config/lift_extra_entries.json), each sized up to the next catalog entry.
+    extra_file = ROOT / "config" / "lift_extra_entries.json"
+    if extra_file.exists():
+        have = {a for a, _ in funcs}
+        starts_ = sorted(have)
+        for key in json.loads(extra_file.read_text(encoding="utf-8")).get(module, {}):
+            a = int(key, 16)
+            if a in have: continue
+            i = bisect.bisect_right(starts_, a)
+            nxt = starts_[i] if i < len(starts_) else a + 0x400
+            funcs.append((a, max(16, min(nxt - a, 0x1000)))); have.add(a)
+        funcs.sort()
     gd = gen_dir(module)
     gd.mkdir(parents=True, exist_ok=True)
     for old in gd.glob("chunk_*.c"): old.unlink()
