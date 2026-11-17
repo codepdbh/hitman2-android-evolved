@@ -104,6 +104,12 @@ const H2GLBackend *h2_gl_null_backend(void);
 #if defined(__ANDROID__)
 const H2GLBackend *h2_gl_gles3_backend(void);           /* OpenGL ES 3.0 over EGL: gl_gles3_backend.c */
 void h2_gles3_set_native_window(void *anativewindow);   /* before the guest creates its context; otherwise a pbuffer is used */
+/* Render thread only: replace/detach the window while retaining the EGL context and its GL resources. */
+int h2_gles3_replace_native_window(void *anativewindow);
+int h2_gles3_present_error(void);
+/* Before init: 0 auto, 1 Mali, 2 Unisoc, 3 Adreno. Uses the system GLES driver. */
+int h2_gles3_set_profile(int profile);
+void h2_gles3_description(char *out, unsigned capacity);
 void h2_gles3_request_capture(const char *ppm_path, uint64_t frame);   /* write that presented frame as a PPM */
 #endif
 

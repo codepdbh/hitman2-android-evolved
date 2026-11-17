@@ -9,10 +9,15 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.view.MotionEvent
 import android.view.View
+import android.view.HapticFeedbackConstants
+import android.view.InputDevice
 import android.widget.LinearLayout
 import android.widget.SeekBar
+import android.widget.TextView
+import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.hypot
 
@@ -24,15 +29,16 @@ import kotlin.math.hypot
  * What is shown depends on what the game is showing (NativeBridge.gameContext):
  *   intro / logos / movies : one labelled SKIP button
  *   menus                  : d-pad + accept, pause (back), the settings gear
- *   mission                : a short default set, a "..." panel with the rest, the settings gear
- * The default screen set is deliberately small. The gear opens the layout settings: which buttons stay on
+ *   mission                : fire, action, crouch, pause + a labelled, paged action drawer
+ * Running uses deliberate outer joystick travel (configurable). Settings live inside the drawer.
+ * The default screen set is deliberately small. Settings choose which buttons stay on
  * screen (the others go to the "..." panel), moving them by dragging, size, opacity, restore defaults. The
  * layout is saved in SharedPreferences.
  *
  * Any touch on empty screen drags the camera (relative mouse); in menus a tap moves the game's cursor there and
  * clicks. Cancelled touches and a paused activity release everything held ([releaseAll]).
  *
- * Layout and feel have only been checked on one phone; see docs/STATUS.md.
+ * Compact layout: compiled and policy-tested headlessly; device ergonomics pending (docs/STATUS.md).
  */
 class TouchHudView(context: Context) : View(context) {
     private enum class Kind { HOLD, TAP, WHEEL_UP, WHEEL_DOWN }
@@ -63,7 +69,6 @@ class TouchHudView(context: Context) : View(context) {
         const val NUM1 = 0x4F; const val NUM3 = 0x51
         const val MIN_PRESS_MS = 60L          // a tap must last long enough for the game's per-frame polling to see it
         const val GAME_W = 800; const val GAME_H = 450
-        const val MOUSE_SPEED = 1.356307f     // Hitman2.ini MouseSpeed
     }
 
     private val buttons = listOf(
@@ -71,8 +76,8 @@ class TouchHudView(context: Context) : View(context) {
         Btn("fire", "Disparar", Kind.HOLD, mouse = 0, main = true, fx = 0.90f, fy = 0.74f, size = 100f),
         Btn("action", "Acción", Kind.HOLD, intArrayOf(E), main = true, fx = 0.77f, fy = 0.87f, size = 72f),
         Btn("crouch", "Agacharse", Kind.HOLD, intArrayOf(LCTRL), main = true, fx = 0.66f, fy = 0.87f, size = 58f),
-        Btn("run", "Correr", Kind.HOLD, intArrayOf(LSHIFT), main = true, fx = 0.78f, fy = 0.64f, size = 58f),
-        Btn("inventory", "Inventario", Kind.HOLD, intArrayOf(Q), main = true, fx = 0.90f, fy = 0.46f, size = 54f),
+        Btn("run", "Correr", Kind.HOLD, intArrayOf(LSHIFT), main = false, fx = 0.78f, fy = 0.64f, size = 58f),
+        Btn("inventory", "Inventario", Kind.HOLD, intArrayOf(Q), main = false, fx = 0.90f, fy = 0.46f, size = 54f),
         Btn("pause", "Pausa", Kind.TAP, intArrayOf(ESC), main = true, fx = 0.955f, fy = 0.10f, size = 48f),
         // in the "..." panel by default (can be pinned to the screen)
         Btn("reload", "Recargar", Kind.TAP, mouse = 1),
@@ -99,11 +104,23 @@ class TouchHudView(context: Context) : View(context) {
     private val moreRect = RectF()
     private val doneRect = RectF()
     private var panelOpen = false
-    private var panelEnabled = true
+    // The drawer is always reachable: hiding it could strand unpinned actions.
+    private val panelRect = RectF()
+    private val settingsRect = RectF()
+    private val pageRect = RectF()
+    private val tabRects = List(TouchHudPolicy.tabs.size) { RectF() }
+    private var panelTab = 0
+    private var panelPage = 0
+    private var panelPages = 1
+    private var panelButtons = emptyList<Btn>()
+    private var runWithJoystick = true
+    private var joyRunning = false
     private var editMode = false
     private var editPointer = -1
     private var editBtn: Btn? = null
     private var userScale = 1.0f
+    private var cameraSensitivity = TouchHudPolicy.DEFAULT_CAMERA_SENSITIVITY
+    private val cameraMotion = CameraMotion()
     var opacity = 0.70f
 
     private var joyBase: Bitmap? = null
@@ -113,8 +130,11 @@ class TouchHudView(context: Context) : View(context) {
     private var joyDx = 0f; private var joyDy = 0f
     private val joyKeysDown = booleanArrayOf(false, false, false, false)       // W A S D
     private var lookPointer = -1
-    private var lookX = 0f; private var lookY = 0f; private var lookDownT = 0L; private var lookMoved = 0f
-    private var skipPointer = -1; private var gearPointer = -1; private var morePointer = -1; private var donePointer = -1
+    private var lookX = 0f; private var lookY = 0f
+    private var menuPointer = -1
+    private var menuPressedAt = 0L
+    private var menuRelease: Runnable? = null
+    private var skipPointer = -1; private var gearPointer = -1; private var donePointer = -1
     /** The game's picture rectangle on screen, for mapping touches to game pixels. */
     var gameRect = RectF(0f, 0f, 1f, 1f)
 
@@ -124,13 +144,16 @@ class TouchHudView(context: Context) : View(context) {
         override fun run() {
             val now = if (NativeBridge.gameLoadError == null) NativeBridge.gameContext() else 0
             if (now != ctx) { releaseAll(); ctx = now; panelOpen = false; editMode = false; layout(); invalidate() }
+            ui.removeCallbacks(this)
             ui.postDelayed(this, 200)
         }
     }
     override fun onAttachedToWindow() { super.onAttachedToWindow(); ui.post(poll) }
-    override fun onDetachedFromWindow() { ui.removeCallbacks(poll); super.onDetachedFromWindow() }
+    override fun onDetachedFromWindow() { releaseAll(); ui.removeCallbacksAndMessages(null); super.onDetachedFromWindow() }
 
     init { loadAssets(); loadLayout() }
+
+    fun reloadSettings() { releaseAll(); loadLayout(); layout(); invalidate() }
 
     // ---------------- assets and saved layout ----------------
     private fun bmp(name: String): Bitmap? = try { context.assets.open("touch_hud/$name.png").use { BitmapFactory.decodeStream(it) } } catch (e: Exception) { null }
@@ -141,44 +164,64 @@ class TouchHudView(context: Context) : View(context) {
     }
 
     private fun loadLayout() {
-        opacity = prefs.getFloat("opacity", 0.70f); userScale = prefs.getFloat("scale", 1.0f); panelEnabled = prefs.getBoolean("panel", true)
+        opacity = prefs.getFloat("opacity", 0.60f).coerceIn(0.2f, 1f)
+        userScale = prefs.getFloat("scale", 1.0f).coerceIn(0.6f, 1.6f)
+        runWithJoystick = prefs.getBoolean("joystick_run", true)
+        cameraSensitivity = prefs.getFloat("camera_sensitivity", TouchHudPolicy.DEFAULT_CAMERA_SENSITIVITY).coerceIn(0.5f, 8f)
         for (b in buttons) {
             if (b.menu) continue
             b.onScreen = prefs.getBoolean("on_${b.name}", b.main)
             b.x = prefs.getFloat("x_${b.name}", b.fx); b.y = prefs.getFloat("y_${b.name}", b.fy)
         }
+        if (prefs.getInt("layout_version", 0) < 2) {
+            val pinned = buttons.filter { !it.menu && it.onScreen }.map { it.name }.toSet()
+            val moved = buttons.any { !it.menu && (it.x != it.fx || it.y != it.fy) }
+            if (TouchHudPolicy.migrateDefault(pinned, moved)) {
+                buttons.filter { !it.menu }.forEach { it.onScreen = it.name in TouchHudPolicy.compact }
+            }
+            saveLayout()
+        }
     }
 
     private fun saveLayout() {
         val e = prefs.edit()
-        e.putFloat("opacity", opacity).putFloat("scale", userScale).putBoolean("panel", panelEnabled)
+        e.putFloat("opacity", opacity).putFloat("scale", userScale)
+            .putInt("layout_version", 2).putBoolean("joystick_run", runWithJoystick)
+            .putFloat("camera_sensitivity", cameraSensitivity)
         for (b in buttons) if (!b.menu) e.putBoolean("on_${b.name}", b.onScreen).putFloat("x_${b.name}", b.x).putFloat("y_${b.name}", b.y)
         e.apply()
     }
 
     private fun resetLayout() {
-        opacity = 0.70f; userScale = 1.0f; panelEnabled = true
+        releaseAll(); panelOpen = false
+        opacity = 0.60f; userScale = 1.0f; runWithJoystick = true
+        cameraSensitivity = TouchHudPolicy.DEFAULT_CAMERA_SENSITIVITY
         for (b in buttons) { b.onScreen = b.main; b.x = b.fx; b.y = b.fy }
         saveLayout(); layout(); invalidate()
     }
 
     // ---------------- layout ----------------
+    private fun tr(text: String) = UiText.t(context, text)
+
     private fun scaled(v: Float) = v * dp * userScale
 
     private fun layout() {
         val w = width.toFloat(); val h = height.toFloat()
         if (w <= 0f || h <= 0f) return
         val m = 20 * dp
-        val js = scaled(150f)
+        val js = minOf(scaled(132f), h * 0.42f)
         joyRect.set(m + 16 * dp, h - js - m, m + 16 * dp + js, h - m)
         for (b in buttons) {
             if (b.menu) continue
-            val sz = scaled(b.size)
-            b.rect.set(b.x * w - sz / 2, b.y * h - sz / 2, b.x * w + sz / 2, b.y * h + sz / 2)
+            val sz = minOf(scaled(b.size), h * 0.27f)
+            val cx = (b.x * w).coerceIn(sz / 2, w - sz / 2)
+            val cy = (b.y * h).coerceIn(sz / 2, h - sz / 2)
+            b.rect.set(cx - sz / 2, cy - sz / 2, cx + sz / 2, cy + sz / 2)
         }
         val gs = 44 * dp
         gearRect.set(m, m, m + gs, m + gs)
-        moreRect.set(w - m - 46 * dp, h * 0.10f + 40 * dp, w - m, h * 0.10f + 40 * dp + 46 * dp)
+        // Keep clear of the original health/suspicion HUD in the top-left of the 16:9 picture.
+        moreRect.set(w / 2 - 50 * dp, m, w / 2 + 50 * dp, m + 48 * dp)
         skipRect.set(w - m - 190 * dp, h - m - 64 * dp, w - m, h - m)
         doneRect.set(w / 2 - 80 * dp, m, w / 2 + 80 * dp, m + 48 * dp)
         // menu layout: bottom-right d-pad + accept
@@ -186,14 +229,29 @@ class TouchHudView(context: Context) : View(context) {
         fun at(n: String, x: Float, y: Float, size: Float) { buttons.first { it.name == n }.menuRect.set(x - size / 2, y - size / 2, x + size / 2, y + size / 2) }
         at("nav_up", cx, cy - u, 64 * dp); at("nav_down", cx, cy + u, 64 * dp); at("nav_left", cx - u, cy, 64 * dp); at("nav_right", cx + u, cy, 64 * dp)
         at("accept", w - m - 1.0f * u, h - m - 1.1f * u, 96 * dp)
-        // panel: cells for every button that is not on screen
-        val cell = 58 * dp; val cols = 6
-        val inPanel = buttons.filter { !it.menu && !it.onScreen }
-        val rows = ((inPanel.size + cols - 1) / cols).coerceAtLeast(1)
-        val x0 = (w - cols * cell) / 2; val y0 = (h - rows * cell) / 2
-        inPanel.forEachIndexed { i, b ->
-            val px = x0 + (i % cols) * cell; val py = y0 + (i / cols) * cell
-            b.menuRect.set(px + 4 * dp, py + 4 * dp, px + cell - 4 * dp, py + cell - 4 * dp)
+        // A modal drawer with labelled cells. Pagination keeps targets usable on small screens.
+        val pw = minOf(w - 2 * m, 480 * dp)
+        panelRect.set((w - pw) / 2, m, (w + pw) / 2, h - m)
+        val innerW = pw - 16 * dp
+        val top = panelRect.top
+        val tabW = innerW / tabRects.size
+        tabRects.forEachIndexed { i, r ->
+            r.set(panelRect.left + 8 * dp + i * tabW, top + 48 * dp,
+                panelRect.left + 8 * dp + (i + 1) * tabW, top + 96 * dp)
+        }
+        settingsRect.set(panelRect.left + 8 * dp, panelRect.bottom - 48 * dp, panelRect.centerX(), panelRect.bottom)
+        pageRect.set(panelRect.centerX(), panelRect.bottom - 48 * dp, panelRect.right - 8 * dp, panelRect.bottom)
+        val all = buttons.filter { inPanel(it) && TouchHudPolicy.group(it.name) == panelTab }
+        val availableH = (panelRect.height() - 144 * dp).coerceAtLeast(1f)
+        val grid = TouchHudPolicy.grid(innerW / dp, availableH / dp, all.size)
+        panelPages = grid.pages; panelPage = panelPage.coerceIn(0, panelPages - 1)
+        panelButtons = all.drop(panelPage * grid.columns * grid.rows).take(grid.columns * grid.rows)
+        val cw = innerW / grid.columns
+        val ch = availableH / grid.rows
+        panelButtons.forEachIndexed { i, b ->
+            val px = panelRect.left + 8 * dp + (i % grid.columns) * cw
+            val py = top + 96 * dp + (i / grid.columns) * ch
+            b.menuRect.set(px + 3 * dp, py + 3 * dp, px + cw - 3 * dp, py + ch - 3 * dp)
         }
     }
 
@@ -205,7 +263,7 @@ class TouchHudView(context: Context) : View(context) {
             b.menu -> false
             b.name == "pause" -> true
             b.onScreen -> true
-            else -> panelOpen && panelEnabled
+            else -> false
         }
         2 -> b.menu || b.name == "pause"
         else -> false
@@ -213,7 +271,7 @@ class TouchHudView(context: Context) : View(context) {
     /** Where a button is drawn and hit-tested: its panel cell, its menu position, or its own place. */
     private fun rectOf(b: Btn): RectF = when {
         ctx == 2 && b.menu -> b.menuRect
-        inPanel(b) -> b.menuRect
+        ctx == 3 && inPanel(b) -> b.menuRect
         else -> b.rect
     }
 
@@ -224,7 +282,7 @@ class TouchHudView(context: Context) : View(context) {
         c.drawRoundRect(r, r.height() / 2, r.height() / 2, paint)
         paint.color = 0xFFEEF2F0.toInt(); paint.alpha = 255
         paint.textSize = size; paint.textAlign = Paint.Align.CENTER; paint.isFakeBoldText = true
-        c.drawText(text, r.centerX(), r.centerY() + size * 0.35f, paint)
+        c.drawText(tr(text), r.centerX(), r.centerY() + size * 0.35f, paint)
         paint.isFakeBoldText = false
         paint.color = 0xFFFFFFFF.toInt()
     }
@@ -248,8 +306,9 @@ class TouchHudView(context: Context) : View(context) {
         }
         for (b in buttons) {
             if (!visible(b)) continue
-            val img = (if (b.pointer >= 0) b.pressed else b.normal) ?: continue
-            c.drawBitmap(img, null, rectOf(b), paint)
+            val img = if (b.pointer >= 0) b.pressed else b.normal
+            if (img != null) c.drawBitmap(img, null, rectOf(b), paint)
+            else drawLabel(c, b.label, rectOf(b), 0xFF30383D.toInt(), 12 * dp)
             if (editMode && b === editBtn) {
                 paint.style = Paint.Style.STROKE; paint.strokeWidth = 3 * dp; paint.color = 0xFFFFD040.toInt()
                 c.drawCircle(rectOf(b).centerX(), rectOf(b).centerY(), rectOf(b).width() / 2 + 4 * dp, paint)
@@ -257,23 +316,73 @@ class TouchHudView(context: Context) : View(context) {
             }
         }
         if (editMode) { drawLabel(c, "LISTO", doneRect, 0xFF2E7D32.toInt(), 20 * dp); return }
-        if (ctx == 3 && panelEnabled) drawLabel(c, "⋯", moreRect, if (panelOpen) 0xFFB02020.toInt() else 0xFF202426.toInt(), 22 * dp)
-        drawLabel(c, "⚙", gearRect, 0xFF202426.toInt(), 22 * dp)
+        if (ctx == 3) {
+            drawLabel(c, "⋯ EQUIPO", moreRect, 0xFF202426.toInt(), 14 * dp)
+            if (joyRunning) drawLabel(c, "CORRER", RectF(joyRect.left, joyRect.top - 28 * dp, joyRect.right, joyRect.top), 0xFF8C2525.toInt(), 12 * dp)
+            else if (joyPointer >= 0 && runWithJoystick) drawLabel(c, "ESTIRA PARA CORRER", RectF(joyRect.left - 10 * dp, joyRect.top - 28 * dp, joyRect.right + 10 * dp, joyRect.top), 0xFF202426.toInt(), 10 * dp)
+        } else if (ctx == 2) drawLabel(c, "⚙", gearRect, 0xFF202426.toInt(), 22 * dp)
+        if (panelOpen) drawPanel(c)
+    }
+
+    private fun drawPanel(c: Canvas) {
+        paint.color = 0xB0000000.toInt(); paint.alpha = 255
+        c.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
+        paint.color = 0xFF181D20.toInt()
+        c.drawRoundRect(panelRect, 16 * dp, 16 * dp, paint)
+        val title = RectF(panelRect.left, panelRect.top, panelRect.right, panelRect.top + 48 * dp)
+        drawLabel(c, "CONTROLES · tocar fuera para cerrar", title, 0xFF181D20.toInt(), 13 * dp)
+        tabRects.forEachIndexed { i, r ->
+            drawLabel(c, TouchHudPolicy.tabs[i], r, if (i == panelTab) 0xFF8C2525.toInt() else 0xFF30383D.toInt(), 14 * dp)
+        }
+        for (b in panelButtons) {
+            val r = b.menuRect
+            paint.color = if (b.pointer >= 0) 0xFF8C2525.toInt() else 0xFF30383D.toInt(); paint.alpha = 255
+            c.drawRoundRect(r, 8 * dp, 8 * dp, paint)
+            val iconSize = minOf(36 * dp, r.height() * 0.53f)
+            (if (b.pointer >= 0) b.pressed else b.normal)?.let {
+                c.drawBitmap(it, null, RectF(r.centerX() - iconSize / 2, r.top + 2 * dp,
+                    r.centerX() + iconSize / 2, r.top + 2 * dp + iconSize), paint)
+            }
+            paint.color = 0xFFF0F2F3.toInt(); paint.textAlign = Paint.Align.CENTER
+            paint.textSize = 12 * dp
+            while (paint.measureText(tr(b.label)) > r.width() - 6 * dp && paint.textSize > 8 * dp) paint.textSize -= dp
+            c.drawText(tr(b.label), r.centerX(), r.bottom - 8 * dp, paint)
+        }
+        drawLabel(c, "⚙ Ajustes", settingsRect, 0xFF30383D.toInt(), 14 * dp)
+        drawLabel(c, "${panelPage + 1}/$panelPages  ›", pageRect, 0xFF30383D.toInt(), 14 * dp)
+    }
+
+    private fun setPanel(open: Boolean) {
+        releaseAll()
+        panelOpen = open
+        layout(); invalidate()
     }
 
     // ---------------- input helpers ----------------
     private fun press(b: Btn, down: Boolean) {
-        for (k in b.keys) NativeBridge.inputKey(k, down)
+        for (k in b.keys) NativeBridge.inputKey(k, down || (k == LSHIFT && joyRunning))
         if (b.mouse >= 0) NativeBridge.inputMouseButton(b.mouse, down)
         if (down) when (b.kind) { Kind.WHEEL_UP -> NativeBridge.inputWheel(120); Kind.WHEEL_DOWN -> NativeBridge.inputWheel(-120); else -> {} }
     }
 
     private val pressedAt = HashMap<Btn, Long>()
-    private fun buttonDown(b: Btn, pid: Int) { b.pointer = pid; pressedAt[b] = System.currentTimeMillis(); press(b, true); invalidate() }
+    private fun buttonDown(b: Btn, pid: Int) {
+        if (prefs.getBoolean("haptics", false)) performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+        pendingReleases.remove(b)?.let { ui.removeCallbacks(it) }
+        b.pointer = pid; pressedAt[b] = SystemClock.uptimeMillis(); press(b, true)
+        // Held actions must expose the world/inventory while the finger remains down.
+        if (panelOpen && b.kind == Kind.HOLD) panelOpen = false
+        invalidate()
+    }
+    private val pendingReleases = HashMap<Btn, Runnable>()
     private fun buttonUp(b: Btn) {
-        val wait = MIN_PRESS_MS - (System.currentTimeMillis() - (pressedAt[b] ?: 0L))
+        val wait = MIN_PRESS_MS - (SystemClock.uptimeMillis() - (pressedAt[b] ?: 0L))
         b.pointer = -1
-        if (wait > 0) ui.postDelayed({ if (b.pointer < 0) press(b, false) }, wait) else press(b, false)
+        if (wait > 0) {
+            val release = Runnable { pendingReleases.remove(b); if (b.pointer < 0) press(b, false) }
+            pendingReleases[b] = release; ui.postDelayed(release, wait)
+        } else press(b, false)
+        if (panelOpen && b.kind == Kind.TAP) panelOpen = false
         invalidate()
     }
 
@@ -291,38 +400,53 @@ class TouchHudView(context: Context) : View(context) {
     private fun updateJoy(x: Float, y: Float) {
         val r = joyRect.width() / 2
         var dx = (x - joyRect.centerX()) / r; var dy = (y - joyRect.centerY()) / r
+        val running = TouchHudPolicy.running(dx, dy, joyRunning, runWithJoystick)
+        if (running != joyRunning) { joyRunning = running; updateRunKey() }
         val len = hypot(dx, dy); if (len > 1f) { dx /= len; dy /= len }
         joyDx = dx; joyDy = dy
         val dead = 0.28f
         setJoy(0, dy < -dead); setJoy(2, dy > dead); setJoy(1, dx < -dead); setJoy(3, dx > dead)
         invalidate()
     }
-    private fun releaseJoy() { joyPointer = -1; joyDx = 0f; joyDy = 0f; for (i in 0..3) setJoy(i, false); invalidate() }
+    private fun updateRunKey() {
+        NativeBridge.inputKey(LSHIFT, joyRunning || buttons.any { it.name == "run" && it.pointer >= 0 })
+    }
+    private fun releaseJoy() { joyRunning = false; updateRunKey(); joyPointer = -1; joyDx = 0f; joyDy = 0f; for (i in 0..3) setJoy(i, false); invalidate() }
 
     private fun toGame(x: Float, y: Float): Pair<Int, Int> {
-        val gx = ((x - gameRect.left) / gameRect.width() * GAME_W).toInt().coerceIn(0, GAME_W - 1)
-        val gy = ((y - gameRect.top) / gameRect.height() * GAME_H).toInt().coerceIn(0, GAME_H - 1)
-        return gx to gy
+        return GamePointer.point(x, y, gameRect.left, gameRect.top, gameRect.width(), gameRect.height())
     }
 
-    /**
-     * The game's menus use DirectInput relative mouse motion only, so a tap must move the game's own cursor: push it
-     * into the top-left corner, wait for that motion to be consumed, move by (target / MouseSpeed), then click.
-     * The game's cursor model (position += delta * speed, clamped) is an assumption not yet confirmed on a menu.
-     */
-    private fun clickGameAt(gx: Int, gy: Int) {
-        NativeBridge.inputMouseMove(-4000, -4000)
-        ui.postDelayed({ NativeBridge.inputMouseMove((gx / MOUSE_SPEED).toInt(), (gy / MOUSE_SPEED).toInt()) }, 90)
-        ui.postDelayed({ NativeBridge.inputMouseButton(0, true) }, 180)
-        ui.postDelayed({ NativeBridge.inputMouseButton(0, false) }, 260)
+    /** The original menu calls GetCursorPos followed by ScreenToClient (guest 0041707B / 00417098). */
+    private fun menuCursor(x: Float, y: Float) {
+        val (gx, gy) = toGame(x, y)
+        NativeBridge.inputCursor(gx, gy)
+    }
+
+    override fun onHoverEvent(event: MotionEvent): Boolean {
+        if (NativeBridge.gameLoadError == null && ctx == 2 && event.isFromSource(InputDevice.SOURCE_MOUSE) &&
+            gameRect.contains(event.x, event.y)) {
+            menuCursor(event.x, event.y)
+            return true
+        }
+        return super.onHoverEvent(event)
     }
 
     /** Releases every held input (cancelled touch, activity paused). */
     fun releaseAll() {
+        // Cancel delayed taps/clicks as well: no stale event may fire after pause or a context change.
+        ui.removeCallbacksAndMessages(null)
+        if (isAttachedToWindow) ui.postDelayed(poll, 200)
+        pressedAt.clear()
+        pendingReleases.clear()
+        menuPointer = -1; menuRelease = null
+        editPointer = -1; editBtn = null
+        cameraMotion.reset()
+        if (NativeBridge.gameLoadError != null) return
         releaseJoy()
         for (b in buttons) if (b.pointer >= 0) { b.pointer = -1; press(b, false) }
         if (skipPointer >= 0) { skipPointer = -1; skip(false) }
-        lookPointer = -1; gearPointer = -1; morePointer = -1; donePointer = -1
+        lookPointer = -1; gearPointer = -1; donePointer = -1
         NativeBridge.inputReset()
         invalidate()
     }
@@ -332,46 +456,68 @@ class TouchHudView(context: Context) : View(context) {
     // ---------------- settings dialogs ----------------
     private fun openSettings() {
         releaseAll()
+        panelOpen = false; invalidate()
         val items = arrayOf("Elegir botones en pantalla…", "Mover botones", "Tamaño…", "Transparencia…",
-            if (panelEnabled) "Ocultar el panel «⋯»" else "Mostrar el panel «⋯»", "Restaurar valores por defecto")
-        AlertDialog.Builder(context).setTitle("Controles táctiles").setItems(items) { _, which ->
+            if (runWithJoystick) "Correr con joystick: activado" else "Correr con joystick: desactivado",
+            "Restaurar diseño compacto", "Ayuda de controles", "Sensibilidad de cámara…")
+        AlertDialog.Builder(context).setTitle(tr("Controles táctiles")).setItems(items.map { tr(it) }.toTypedArray()) { _, which ->
             when (which) {
                 0 -> chooseButtons()
                 1 -> { if (ctx == 3) { editMode = true; panelOpen = false; invalidate() } }
                 2 -> slider("Tamaño de los botones", (userScale * 100).toInt() - 60, 100) { userScale = (it + 60) / 100f; layout(); saveLayout(); invalidate() }
                 3 -> slider("Transparencia (a la derecha, más visibles)", (opacity * 100).toInt() - 20, 80) { opacity = (it + 20) / 100f; saveLayout(); invalidate() }
-                4 -> { panelEnabled = !panelEnabled; panelOpen = false; saveLayout(); invalidate() }
+                4 -> { runWithJoystick = !runWithJoystick; saveLayout(); invalidate() }
                 5 -> resetLayout()
+                6 -> AlertDialog.Builder(context).setTitle(tr("Controles compactos"))
+                    .setMessage(tr("Mueve el joystick para caminar. Arrastra hacia delante más allá del borde para correr; vuelve al centro para caminar. Puedes desactivarlo y fijar Correr en pantalla.\n\nArrastra por la zona libre para mirar. Disparar, Acción y Agacharse funcionan mientras mantienes el dedo.\n\nEQUIPO abre todas las acciones por categorías. Las acciones mantenidas, como Inventario, se sueltan al levantar el dedo. Toca fuera para cerrar. Pausa abre el menú del juego.\n\nLos ajustes permiten fijar acciones, moverlas y cambiar tamaño y transparencia."))
+                    .setPositiveButton(tr("Entendido"), null).show()
+                7 -> slider("Sensibilidad de cámara", (cameraSensitivity * 100).toInt() - 50, 750,
+                    formatter = { String.format(Locale.ROOT, "%.1f×", (it + 50) / 100f) }) {
+                    cameraSensitivity = (it + 50) / 100f
+                    cameraMotion.reset(); saveLayout()
+                }
             }
-        }.setNegativeButton("Cerrar", null).show()
+        }.setNegativeButton(tr("Cerrar"), null).show()
     }
 
     private fun chooseButtons() {
         val list = buttons.filter { !it.menu && it.name != "pause" }
-        val labels = list.map { it.label }.toTypedArray()
+        val labels = list.map { tr(it.label) }.toTypedArray()
         val checked = BooleanArray(list.size) { list[it].onScreen }
-        AlertDialog.Builder(context).setTitle("Botones en pantalla (los demás van al panel «⋯»)")
+        AlertDialog.Builder(context).setTitle(tr("Botones en pantalla (los demás van al panel «⋯»)"))
             .setMultiChoiceItems(labels, checked) { _, i, on -> checked[i] = on }
             .setPositiveButton("Aceptar") { _, _ ->
+                var added = 0
                 list.forEachIndexed { i, b ->
-                    if (checked[i] && !b.onScreen) { b.x = 0.5f; b.y = 0.5f }    // newly pinned: starts in the middle, then drag it with "Mover botones"
+                    if (checked[i] && !b.onScreen) {
+                        // Give newly pinned controls separate starting slots, then allow dragging.
+                        b.x = 0.40f + (added % 5) * 0.11f
+                        b.y = 0.28f + (added / 5) * 0.14f
+                        added++
+                    }
                     b.onScreen = checked[i]
                 }
+                if (added > 0) { editMode = ctx == 3; panelOpen = false }
                 saveLayout(); layout(); invalidate()
-                if (list.any { it.onScreen && !it.main && it.x == 0.5f && it.y == 0.5f }) { editMode = ctx == 3; panelOpen = false }
-            }.setNegativeButton("Cancelar", null).show()
+            }.setNegativeButton(tr("Cancelar"), null).show()
     }
 
-    private fun slider(title: String, value: Int, max: Int, onChange: (Int) -> Unit) {
+    private fun slider(title: String, value: Int, max: Int, formatter: ((Int) -> String)? = null, onChange: (Int) -> Unit) {
         val bar = SeekBar(context); bar.max = max; bar.progress = value.coerceIn(0, max)
         val pad = (20 * dp).toInt()
-        val box = LinearLayout(context); box.setPadding(pad, pad, pad, pad); box.addView(bar, LinearLayout.LayoutParams(-1, -2))
+        val box = LinearLayout(context); box.orientation = LinearLayout.VERTICAL; box.setPadding(pad, pad, pad, pad)
+        val readout = TextView(context)
+        if (formatter != null) { readout.text = formatter(bar.progress); box.addView(readout) }
+        box.addView(bar, LinearLayout.LayoutParams(-1, -2))
         bar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(s: SeekBar?, p: Int, u: Boolean) { onChange(p) }
+            override fun onProgressChanged(s: SeekBar?, p: Int, u: Boolean) {
+                if (formatter != null) readout.text = formatter(p)
+                onChange(p)
+            }
             override fun onStartTrackingTouch(s: SeekBar?) {}
             override fun onStopTrackingTouch(s: SeekBar?) {}
         })
-        AlertDialog.Builder(context).setTitle(title).setView(box).setPositiveButton("Listo", null).show()
+        AlertDialog.Builder(context).setTitle(tr(title)).setView(box).setPositiveButton(tr("Listo"), null).show()
     }
 
     // ---------------- touch ----------------
@@ -390,14 +536,32 @@ class TouchHudView(context: Context) : View(context) {
                     if (skipRect.contains(x, y)) { skipPointer = id; skip(true); invalidate() }
                     return true
                 }
-                if ((ctx == 2 || ctx == 3) && gearRect.contains(x, y)) { gearPointer = id; return true }
-                if (ctx == 3 && panelEnabled && moreRect.contains(x, y)) { morePointer = id; panelOpen = !panelOpen; invalidate(); return true }
+                if (ctx == 3 && panelOpen) {
+                    if (!panelRect.contains(x, y)) { setPanel(false); return true }
+                    val tab = tabRects.indexOfFirst { it.contains(x, y) }
+                    if (tab >= 0) { releaseAll(); panelTab = tab; panelPage = 0; layout(); invalidate(); return true }
+                    if (settingsRect.contains(x, y)) { openSettings(); return true }
+                    if (pageRect.contains(x, y)) { releaseAll(); panelPage = (panelPage + 1) % panelPages; layout(); invalidate(); return true }
+                    panelButtons.lastOrNull { it.pointer < 0 && it.menuRect.contains(x, y) }?.let { buttonDown(it, id) }
+                    return true
+                }
+                if (ctx == 2 && gearRect.contains(x, y)) { gearPointer = id; return true }
+                if (ctx == 3 && moreRect.contains(x, y)) { setPanel(true); return true }
                 val b = buttonAt(x, y)
                 if (b != null) { buttonDown(b, id); return true }
+                if (ctx == 2) {
+                    if (menuPointer < 0 && gameRect.contains(x, y)) {
+                        menuRelease?.let { ui.removeCallbacks(it) }; menuRelease = null
+                        menuPointer = id; menuPressedAt = SystemClock.uptimeMillis()
+                        menuCursor(x, y)
+                        NativeBridge.inputMouseButton(0, true)
+                    }
+                    return true
+                }
                 if (ctx == 3 && joyPointer < 0 && joyRect.contains(x, y)) { joyPointer = id; updateJoy(x, y); return true }
                 if (lookPointer < 0) {
-                    lookPointer = id; lookX = x; lookY = y; lookDownT = System.currentTimeMillis(); lookMoved = 0f
-                    if (ctx == 3 && panelOpen) { panelOpen = false; invalidate() }                // a tap outside closes the panel
+                    lookPointer = id; lookX = x; lookY = y
+                    cameraMotion.reset()
                 }
             }
             MotionEvent.ACTION_MOVE -> {
@@ -405,11 +569,16 @@ class TouchHudView(context: Context) : View(context) {
                     val id = e.getPointerId(i); val x = e.getX(i); val y = e.getY(i)
                     if (editMode && id == editPointer) {
                         editBtn?.let { it.x = (x / width).coerceIn(0.03f, 0.97f); it.y = (y / height).coerceIn(0.05f, 0.95f); layout(); invalidate() }
-                    } else if (id == joyPointer) updateJoy(x, y)
+                    } else if (id == menuPointer) menuCursor(x, y)
+                    else if (id == joyPointer) updateJoy(x, y)
                     else if (id == lookPointer) {
                         val dx = x - lookX; val dy = y - lookY
-                        lookX = x; lookY = y; lookMoved += abs(dx) + abs(dy)
-                        if (ctx == 3) { val k = GAME_W / gameRect.width(); NativeBridge.inputMouseMove((dx * k * 1.6f).toInt(), (dy * k * 1.6f).toInt()) }
+                        lookX = x; lookY = y
+                        if (ctx == 3) {
+                            val gain = GAME_W / gameRect.width().coerceAtLeast(1f) * 1.6f * cameraSensitivity
+                            val (mx, my) = cameraMotion.consume(dx, dy, gain)
+                            if (mx != 0 || my != 0) NativeBridge.inputMouseMove(mx, my)
+                        }
                     }
                 }
             }
@@ -419,14 +588,16 @@ class TouchHudView(context: Context) : View(context) {
                 if (id == editPointer) { editPointer = -1; saveLayout() }
                 if (id == skipPointer) { skipPointer = -1; skip(false); invalidate() }
                 if (id == gearPointer) { gearPointer = -1; openSettings() }
-                if (id == morePointer) morePointer = -1
                 buttons.firstOrNull { it.pointer == id }?.let { buttonUp(it) }
+                if (id == menuPointer) {
+                    menuCursor(e.getX(i), e.getY(i)); menuPointer = -1
+                    val delay = (MIN_PRESS_MS - (SystemClock.uptimeMillis() - menuPressedAt)).coerceAtLeast(0L)
+                    val release = Runnable { NativeBridge.inputMouseButton(0, false); menuRelease = null }
+                    menuRelease = release; ui.postDelayed(release, delay)
+                }
                 if (id == joyPointer) releaseJoy()
                 if (id == lookPointer) {
                     lookPointer = -1
-                    if (System.currentTimeMillis() - lookDownT < 250 && lookMoved < 24 * dp && ctx == 2) {      // a tap in a menu = click there
-                        val (gx, gy) = toGame(lookX, lookY); clickGameAt(gx, gy)
-                    }
                 }
             }
             MotionEvent.ACTION_CANCEL -> releaseAll()

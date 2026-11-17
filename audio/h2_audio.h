@@ -30,6 +30,8 @@ void h2_audio_set_backend(const H2AudioBackend *b);
 void h2_audio_stop(void);                                 /* close the output (the mixer stops being called) */       /* before the guest creates its DirectSound device */
 #if defined(__ANDROID__)
 const H2AudioBackend *h2_audio_aaudio_backend(void);
+/* Silence output and freeze mixer cursors while Android has no foreground game surface. */
+void h2_audio_aaudio_set_paused(int paused);
 #endif
 
 #ifdef __cplusplus

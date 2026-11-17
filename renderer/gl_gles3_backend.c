@@ -19,12 +19,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <pthread.h>
 
 #include <EGL/egl.h>
 #include <GLES3/gl3.h>
 
 #include "h2_gl.h"
 #include "h2_log.h"
+#include "egl_config_policy.h"
 
 #ifndef GL_CLAMP
 #define GL_CLAMP 0x2900
@@ -33,14 +35,54 @@
 static EGLDisplay g_dpy = EGL_NO_DISPLAY;
 static EGLSurface g_surf = EGL_NO_SURFACE;
 static EGLContext g_ctx = EGL_NO_CONTEXT;
+static EGLConfig g_config;
+static EGLint g_present_error;
 static void *g_native_window;
 static int g_w, g_h;
 static uint64_t g_frame;
 static char g_cap_path[260];
 static uint64_t g_cap_frame;
 static unsigned g_draws_this_frame;
+static int g_profile;
+static pthread_mutex_t g_info_lock = PTHREAD_MUTEX_INITIALIZER;
+static char g_info[768] = "GPU information available after starting the game.";
+
+int h2_gles3_set_profile(int profile) {
+    if (profile < 0 || profile > 3) return -1;
+    g_profile = profile;
+    return 0;
+}
+void h2_gles3_description(char *out, unsigned capacity) {
+    if (!capacity) return;
+    pthread_mutex_lock(&g_info_lock);
+    snprintf(out, capacity, "%s", g_info);
+    pthread_mutex_unlock(&g_info_lock);
+}
 
 void h2_gles3_set_native_window(void *anativewindow) { g_native_window = anativewindow; }
+int h2_gles3_present_error(void) { return g_present_error; }
+
+int h2_gles3_replace_native_window(void *window)
+{
+    if (g_dpy == EGL_NO_DISPLAY || g_ctx == EGL_NO_CONTEXT) return -1;
+    if (!eglMakeCurrent(g_dpy, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT)) goto failed;
+    if (g_surf != EGL_NO_SURFACE) {
+        if (!eglDestroySurface(g_dpy, g_surf)) goto failed;
+        g_surf = EGL_NO_SURFACE;
+    }
+    g_native_window = window;
+    if (window) {
+        g_surf = eglCreateWindowSurface(g_dpy, g_config, (EGLNativeWindowType)window, 0);
+        if (g_surf == EGL_NO_SURFACE || !eglMakeCurrent(g_dpy, g_surf, g_surf, g_ctx)) goto failed;
+        if (!eglSwapInterval(g_dpy, 1)) goto failed;
+    }
+    g_present_error = 0;
+    H2_INFO(H2_LOG_GRAPHICS, "EGL window %s; context and textures retained", window ? "reattached" : "detached");
+    return 0;
+failed:
+    H2_ERROR(H2_LOG_GRAPHICS, "EGL window replacement failed: 0x%X", eglGetError());
+    return -1;
+}
 void h2_gles3_request_capture(const char *ppm_path, uint64_t frame)
 {
     snprintf(g_cap_path, sizeof g_cap_path, "%s", ppm_path);
@@ -324,21 +366,32 @@ static void upload_uniforms(const H2GLState *s)
 }
 
 /* ---------------- backend functions ---------------- */
+static int try_surface_config(void *user, int depth, int stencil)
+{
+    const EGLint attr[] = { EGL_RENDERABLE_TYPE, EGL_OPENGL_ES3_BIT,
+        EGL_SURFACE_TYPE, g_native_window ? EGL_WINDOW_BIT : EGL_PBUFFER_BIT,
+        EGL_RED_SIZE, 8, EGL_GREEN_SIZE, 8, EGL_BLUE_SIZE, 8, EGL_ALPHA_SIZE, 8,
+        EGL_DEPTH_SIZE, depth, EGL_STENCIL_SIZE, stencil, EGL_NONE };
+    EGLint count = 0;
+    if (!eglChooseConfig(g_dpy, attr, (EGLConfig *)user, 1, &count)) {
+        H2_ERROR(H2_LOG_GRAPHICS, "eglChooseConfig failed (0x%X)", eglGetError());
+        return -1;
+    }
+    H2_INFO(H2_LOG_GRAPHICS, "EGL surface candidate depth=%d stencil=%d: %s", depth, stencil, count ? "available" : "unavailable");
+    return count > 0;
+}
+
 static int gb_init(int w, int h)
 {
     g_w = w; g_h = h;
     g_dpy = eglGetDisplay(EGL_DEFAULT_DISPLAY);
     EGLint maj, min;
     if (g_dpy == EGL_NO_DISPLAY || !eglInitialize(g_dpy, &maj, &min)) { H2_ERROR(H2_LOG_GRAPHICS, "EGL: no display (0x%X)", eglGetError()); return -1; }
-    const EGLint cfg_attr[] = { EGL_RENDERABLE_TYPE, EGL_OPENGL_ES3_BIT, EGL_SURFACE_TYPE, g_native_window ? EGL_WINDOW_BIT : EGL_PBUFFER_BIT,
-                                EGL_RED_SIZE, 8, EGL_GREEN_SIZE, 8, EGL_BLUE_SIZE, 8, EGL_ALPHA_SIZE, 8, EGL_DEPTH_SIZE, 24, EGL_STENCIL_SIZE, 8, EGL_NONE };
-    EGLConfig cfg; EGLint n = 0;
-    if (!eglChooseConfig(g_dpy, cfg_attr, &cfg, 1, &n) || n < 1) {
-        const EGLint relaxed[] = { EGL_RENDERABLE_TYPE, EGL_OPENGL_ES3_BIT, EGL_SURFACE_TYPE, g_native_window ? EGL_WINDOW_BIT : EGL_PBUFFER_BIT,
-                                   EGL_RED_SIZE, 8, EGL_GREEN_SIZE, 8, EGL_BLUE_SIZE, 8, EGL_ALPHA_SIZE, 8, EGL_DEPTH_SIZE, 16, EGL_NONE };
-        if (!eglChooseConfig(g_dpy, relaxed, &cfg, 1, &n) || n < 1) { H2_ERROR(H2_LOG_GRAPHICS, "EGL: no ES3 config"); return -1; }
-        H2_WARN(H2_LOG_GRAPHICS, "EGL: no 24-bit depth + stencil config; using 16-bit depth, no stencil");
-    }
+    EGLConfig cfg;
+    int selected = h2_egl_select_config(g_profile, try_surface_config, &cfg);
+    if (selected < 0) { H2_ERROR(H2_LOG_GRAPHICS, "EGL: no usable ES3 surface for graphics profile %d", g_profile); return -1; }
+    if (selected > 0) H2_WARN(H2_LOG_GRAPHICS, "EGL compatibility surface: requested depth=%d stencil=%d", h2_egl_formats[selected][0], h2_egl_formats[selected][1]);
+    g_config = cfg;
     if (g_native_window) g_surf = eglCreateWindowSurface(g_dpy, cfg, (EGLNativeWindowType)g_native_window, 0);
     else { const EGLint pb[] = { EGL_WIDTH, w, EGL_HEIGHT, h, EGL_NONE }; g_surf = eglCreatePbufferSurface(g_dpy, cfg, pb); }
     if (g_surf == EGL_NO_SURFACE) { H2_ERROR(H2_LOG_GRAPHICS, "EGL: surface creation failed (0x%X)", eglGetError()); return -1; }
@@ -347,6 +400,21 @@ static int gb_init(int w, int h)
     if (g_ctx == EGL_NO_CONTEXT || !eglMakeCurrent(g_dpy, g_surf, g_surf, g_ctx)) { H2_ERROR(H2_LOG_GRAPHICS, "EGL: context failed (0x%X)", eglGetError()); return -1; }
     H2_INFO(H2_LOG_GRAPHICS, "GLES: %s | %s | %s (%s surface %dx%d)", (const char *)glGetString(GL_VENDOR), (const char *)glGetString(GL_RENDERER),
             (const char *)glGetString(GL_VERSION), g_native_window ? "window" : "pbuffer", w, h);
+    GLint max_texture = 0, texture_units = 0;
+    glGetIntegerv(GL_MAX_TEXTURE_SIZE, &max_texture);
+    glGetIntegerv(GL_MAX_TEXTURE_IMAGE_UNITS, &texture_units);
+    if (texture_units < 2) { H2_ERROR(H2_LOG_GRAPHICS, "GLES: two texture units are required, found %d", texture_units); return -1; }
+    EGLint actual_depth = 0, actual_stencil = 0;
+    if (!eglGetConfigAttrib(g_dpy, cfg, EGL_DEPTH_SIZE, &actual_depth) ||
+        !eglGetConfigAttrib(g_dpy, cfg, EGL_STENCIL_SIZE, &actual_stencil)) {
+        H2_ERROR(H2_LOG_GRAPHICS, "EGL: cannot inspect selected surface (0x%X)", eglGetError()); return -1;
+    }
+    pthread_mutex_lock(&g_info_lock);
+    snprintf(g_info, sizeof g_info, "%s | %s\n%s\nSystem GLES driver | profile %d | depth %d, stencil %d\nMax texture %d | texture units %d",
+        (const char *)glGetString(GL_VENDOR), (const char *)glGetString(GL_RENDERER), (const char *)glGetString(GL_VERSION),
+        g_profile, actual_depth, actual_stencil, max_texture, texture_units);
+    pthread_mutex_unlock(&g_info_lock);
+    H2_INFO(H2_LOG_GRAPHICS, "graphics profile %d: depth=%d stencil=%d max_texture=%d units=%d", g_profile, actual_depth, actual_stencil, max_texture, texture_units);
     if (g_native_window) eglSwapInterval(g_dpy, 1);         /* pace to the display: the game would otherwise run at hundreds of fps */
     if (build_program() != 0) return -1;
     glGenVertexArrays(1, &g_vao); glGenBuffers(1, &g_vbo); glGenBuffers(1, &g_ebo);
@@ -399,7 +467,11 @@ static void gb_present(void)
     /* capture the first frame at or after the requested one that actually drew something (most frames are bare clears) */
     if (g_cap_path[0] && g_frame >= g_cap_frame && g_draws_this_frame > 0) { write_ppm(g_cap_path); g_cap_path[0] = 0; }
     g_draws_this_frame = 0;
-    eglSwapBuffers(g_dpy, g_surf);
+    g_present_error = 0;
+    if (!eglSwapBuffers(g_dpy, g_surf)) {
+        g_present_error = eglGetError();
+        H2_ERROR(H2_LOG_GRAPHICS, "eglSwapBuffers failed: 0x%X", g_present_error);
+    }
 }
 static void gb_flush(void) { glFlush(); }
 

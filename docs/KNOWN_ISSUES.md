@@ -1,5 +1,14 @@
 # Problemas conocidos y bloqueos
 
+## Launcher, idioma, cursor y GPU (2026-11-17)
+
+- **Bloqueado (datos):** inglés dentro del juego; la copia disponible es española. Inglés/Español del launcher y HUD no cambia los recursos del juego.
+- **Parcial:** cursor absoluto/clic/arrastre/hover de menús implementados y compilados; prueba física aplazada por el propietario. El contexto sigue basado en escenas y no identifica todos los menús internos de misión.
+- **Parcial:** perfiles Mali/Unisoc/Adreno y selección EGL alternativa implementados; solo la política C se ha probado con simulación. No hay validación de los perfiles nuevos en hardware ni cargador de drivers externos. GLES 2 no está soportado.
+- **Pendiente:** mapeo de mandos Android a las entradas del juego. Detección de un mando por Android no implica soporte jugable.
+- **Pendiente:** reiniciar el runtime global dentro del mismo proceso tras una parada terminal; el launcher lo indica en vez de iniciar una sesión corrupta.
+
+
 Actualizado: 2026-11-09. Cada entrada dice cómo se detectó. Nada aquí está "resuelto" devolviendo éxito falso.
 
 ## Bloqueos
@@ -103,3 +112,13 @@ Las correcciones 1, 2, 3 y 5 son candidatas a enviarse a PCRecomp.
 
 - Un fallo del arnés despertaba a `WerFault.exe` (informe de errores de Windows). Ahora el arnés captura sus propios fallos y `worksafe.py` fija el modo de error heredable; no debería volver a ocurrir.
 - clang no localiza Visual Studio 18 por sí solo: `scripts/toolchain.py` le pasa MSVC y el SDK de Windows explícitamente.
+## HUD compacto (2026-11-17)
+
+- **Parcial:** compilación, ocho pruebas y comprobación inicial del HUD dentro del tutorial en S25. El propietario confirma funcionamiento preliminar. Faltan acciones y combinaciones multitáctiles verificadas de forma aislada. Ver `docs/evidence/s25_resume_2026-11-17.md`.
+- El contexto del HUD sigue deducido de la escena cargada; no permite ocultar controles según arma, combate o cinemática interna de misión. Se evita inferir esos estados sin evidencia.
+- Los diseños anteriores personalizados se conservan. Para aplicar la reducción completa, usar EQUIPO → Ajustes → Restaurar diseño compacto.
+
+## Reentrada de Android (2026-11-17)
+
+- **Probado (caso registrado):** resuelta la pantalla negra causada por detener el motor en `surfaceDestroyed`; retirar y volver a conectar la superficie conserva contexto EGL y misión en S25 (suspensión y reanudación en fotograma 2905).
+- **Pendiente:** pérdida real del contexto GPU, suspensión durante cargas, bloqueo de pantalla y recuperación tras muerte del proceso. La pérdida de contexto no se simula como éxito: un fallo de reconexión/presentación detiene el invitado y se muestra al usuario.

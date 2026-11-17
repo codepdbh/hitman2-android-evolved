@@ -27,9 +27,15 @@ object NativeBridge {
 
     /** Starts the game on a native thread drawing into [surface]. False if it could not start. */
     external fun startGame(surface: android.view.Surface, gameDir: String, userDir: String): Boolean
-    /** Asks the game to stop and waits for it. */
+    /** Requests a terminal stop asynchronously; backgrounding uses setGamePaused instead. */
     external fun stopGame()
     external fun gameRunning(): Boolean
+    /** Android lifecycle: retain the guest and GL resources, park rendering without a foreground surface. */
+    external fun setGamePaused(paused: Boolean)
+    external fun setGameSurface(surface: android.view.Surface?): Boolean
+    external fun gameStopMessage(): String?
+    external fun setGraphicsProfile(profile: Int): Boolean
+    external fun graphicsInfo(): String
 
     // Input into the game's InputManager (DirectInput scan codes; mouse relative + absolute cursor in game pixels).
     external fun inputKey(dik: Int, down: Boolean)

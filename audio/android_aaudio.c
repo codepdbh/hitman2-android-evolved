@@ -5,16 +5,20 @@
 #if defined(__ANDROID__)
 #include <aaudio/AAudio.h>
 #include <string.h>
+#include <stdatomic.h>
 
 #include "h2_audio.h"
 #include "h2_log.h"
 
 static AAudioStream *g_stream;
+static atomic_int g_paused;
+void h2_audio_aaudio_set_paused(int paused) { atomic_store(&g_paused, paused != 0); }
 
 static aaudio_data_callback_result_t on_audio(AAudioStream *s, void *user, void *data, int32_t frames)
 {
     (void)s; (void)user;
-    h2_ds_mix((int16_t *)data, (unsigned)frames);
+    if (atomic_load(&g_paused)) memset(data, 0, (size_t)frames * 2 * sizeof(int16_t));
+    else h2_ds_mix((int16_t *)data, (unsigned)frames);
     return AAUDIO_CALLBACK_RESULT_CONTINUE;
 }
 

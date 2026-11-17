@@ -1,5 +1,34 @@
 # Estado del proyecto
 
+## Preview v0.2.0-preview.1 — 2026-11-17
+
+- **Compilado:** APK ARM64 de desarrollo, `versionCode` 2; firma comprobada y paquete revisado sin datos originales ni claves. Preparado como adjunto de GitHub Releases, con SHA-256; no se versiona el APK en Git.
+- **Implementado:** README orientado a instalación, copia de datos originales por USB/ADB y arranque, con requisitos y límites de compatibilidad por edición.
+- La validación física pendiente del cursor/perfiles GPU se mantiene. Evidencia del artefacto: [preview_0_2_0_2026-11-17.md](evidence/preview_0_2_0_2026-11-17.md).
+
+## Actualización 2026-11-17 — launcher, idiomas y compatibilidad gráfica
+
+- **Parcial:** launcher nativo rediseñado con Jugar/Continuar, archivos/permisos/carpeta y ajustes de controles, audio, pantalla y GPU. Entrada desde Jugar y menú principal comprobados en S25; perfil privado conserva opciones no administradas.
+- **Probado (interfaz del launcher):** cambio Español/English y preferencias. **Implementado:** traducciones del HUD y ayuda. **Bloqueado (juego en inglés):** el propietario solo dispone de datos españoles; el launcher lo indica.
+- **Compilado e instalado:** corrección de posición absoluta del cursor en menús. Prueba de clics/arrastre pendiente por petición del propietario («Lo estoy usando; prueba después»).
+- **Compilado:** perfiles EGL automático, Mali, Unisoc y Snapdragon/Adreno; información del GPU/driver reales tras iniciar el contexto. APK completo correcto en 1 min 22 s; 16 pruebas JUnit y nueve casos de política C pasan. Usan el driver Android, sin cargadores de drivers externos. Instalación y validación física de esta última versión pendientes a petición del propietario.
+- **Pendiente:** soporte de mandos; se muestra la diferencia entre detección por Android y mapeo al juego.
+- Detalles y evidencia: [LAUNCHER.md](LAUNCHER.md), [launcher_2026-11-17.md](evidence/launcher_2026-11-17.md).
+
+## Actualización 2026-11-17 — prueba en S25, reentrada y cámara
+
+- **Probado (S25, caso concreto):** APK actualizado instalado; tutorial visible; salida a la actividad de diagnóstico y regreso tras unos 22 s con el mismo proceso y el mismo fotograma de suspensión/reanudación (2905), sin reiniciar la misión. EGL reconecta la superficie conservando contexto y texturas. El propietario confirma «funciona bien por ahora».
+- **Implementado:** el ciclo Android suspende el invitado al presentar un fotograma y lo reanuda con una nueva superficie; libera entradas y silencia/congela el mezclador en segundo plano. Los fallos de reconexión/presentación se notifican; no se intenta reinicializar el runtime global dentro del mismo proceso.
+- **Probado (lógica):** ocho pruebas Kotlin, cero fallos; sensibilidad inicial 3× respecto a la anterior, ajuste 0,5–8× y acumulación de fracciones para evitar perder movimientos lentos. EQUIPO se mueve al centro superior para liberar la barra de salud.
+- **Parcial (cobertura):** faltan suspensión durante cargas, pérdida real de contexto GPU, destrucción del proceso por Android, bloqueo de pantalla y validación exhaustiva de todas las acciones. Evidencia: [s25_resume_2026-11-17.md](evidence/s25_resume_2026-11-17.md). Esta actualización sustituye las notas siguientes que indicaban que el APK no estaba instalado o que perder la superficie detenía siempre el juego.
+
+## Actualización 2026-11-17 — controles compactos
+
+- **Parcial:** HUD de misión reducido de ocho a cinco botones más joystick; correr mediante recorrido exterior configurable; panel modal con categorías, etiquetas y páginas; ajustes dentro del panel y migración que conserva personalizaciones. Detalle: [TOUCH_CONTROLS.md](TOUCH_CONTROLS.md).
+- **Probado (lógica Kotlin):** cinco pruebas unitarias pasan; compilación Kotlin correcta. No equivale a validación de jugabilidad ni a pruebas diferenciales del juego. Evidencia: [touch_hud_2026-11-17.md](evidence/touch_hud_2026-11-17.md).
+- **Compilado:** APK ARM64 completo en `android/app/build/outputs/apk/debug/app-debug.apk` (`assembleDebug` correcto, 2 min 58 s); no instalado en esta sesión.
+- **Pendiente:** validación visual, multitáctil y de acciones dentro de una misión en Android. No se ha abierto el juego en Windows.
+
 Última actualización: 2026-11-09 (sesión 1, bloque 2).
 Estados: Implementado · Compilado · Probado · Parcial · Bloqueado · Pendiente.
 "Probado" exige una prueba ejecutada con evidencia en `docs/evidence/` o un comando reproducible.
