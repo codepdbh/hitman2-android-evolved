@@ -92,6 +92,7 @@ void h2_gles3_request_capture(const char *ppm_path, uint64_t frame)
 /* ---------------- shaders ---------------- */
 static const char *k_vs =
 "#version 300 es\n"
+"invariant gl_Position;\n"
 "layout(location=0) in vec4 a_pos; layout(location=1) in vec3 a_nrm; layout(location=2) in vec4 a_col;\n"
 "layout(location=3) in vec4 a_tc0; layout(location=4) in vec4 a_tc1;\n"
 "uniform mat4 u_mv, u_proj, u_texm0, u_texm1; uniform mat3 u_nmat;\n"
@@ -373,6 +374,17 @@ static int try_surface_config(void *user, int depth, int stencil)
         EGL_RED_SIZE, 8, EGL_GREEN_SIZE, 8, EGL_BLUE_SIZE, 8, EGL_ALPHA_SIZE, 8,
         EGL_DEPTH_SIZE, depth, EGL_STENCIL_SIZE, stencil, EGL_NONE };
     EGLint count = 0;
+    {   /* Prefer a 4x multisampled surface (the game's ini asks for Antialias 4); without one, the plain surface below. */
+        const EGLint msaa[] = { EGL_RENDERABLE_TYPE, EGL_OPENGL_ES3_BIT,
+            EGL_SURFACE_TYPE, g_native_window ? EGL_WINDOW_BIT : EGL_PBUFFER_BIT,
+            EGL_RED_SIZE, 8, EGL_GREEN_SIZE, 8, EGL_BLUE_SIZE, 8, EGL_ALPHA_SIZE, 8,
+            EGL_DEPTH_SIZE, depth, EGL_STENCIL_SIZE, stencil, EGL_SAMPLE_BUFFERS, 1, EGL_SAMPLES, 4, EGL_NONE };
+        if (eglChooseConfig(g_dpy, msaa, (EGLConfig *)user, 1, &count) && count > 0) {
+            H2_INFO(H2_LOG_GRAPHICS, "EGL surface candidate depth=%d stencil=%d 4x MSAA: available", depth, stencil);
+            return 1;
+        }
+        count = 0;
+    }
     if (!eglChooseConfig(g_dpy, attr, (EGLConfig *)user, 1, &count)) {
         H2_ERROR(H2_LOG_GRAPHICS, "eglChooseConfig failed (0x%X)", eglGetError());
         return -1;

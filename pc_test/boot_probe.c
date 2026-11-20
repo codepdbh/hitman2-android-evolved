@@ -221,6 +221,7 @@ int main(int argc, char **argv)
                (unsigned long long)gs.clears, (unsigned long long)gs.tex_uploads, (unsigned long long)gs.tex_bytes,
                gs.textures_live, (unsigned long long)gs.errors);
     }
+    h2_gl_null_report();
     static H2ImportStat st[2048];
     size_t ns = h2_imports_report(st, 2048);
     unsigned called = 0; uint64_t calls = 0;

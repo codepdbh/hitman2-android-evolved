@@ -101,6 +101,7 @@ typedef void (*H2GLFrameHook)(uint64_t frames_presented);
 void h2_gl_set_frame_hook(H2GLFrameHook hook);
 void h2_register_opengl(void);                          /* registers OPENGL32 + wgl + GDI pixel-format imports */
 const H2GLBackend *h2_gl_null_backend(void);
+void h2_gl_null_report(void);                           /* print the null backend's draw-state histogram */
 #if defined(__ANDROID__)
 const H2GLBackend *h2_gl_gles3_backend(void);           /* OpenGL ES 3.0 over EGL: gl_gles3_backend.c */
 void h2_gles3_set_native_window(void *anativewindow);   /* before the guest creates its context; otherwise a pbuffer is used */

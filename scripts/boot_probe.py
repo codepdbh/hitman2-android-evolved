@@ -34,6 +34,9 @@ GAME_EXE = GAME_DIR / "hitman2.exe"
 GAME_FILES = ["hitman2.exe", "Hitman2.ini", "RenderOpenGL.dll", "keyboard.cfg"]
 
 
+SCENE_OVERRIDE: str | None = None          # --scene: DefaultScene for this run (tests only)
+
+
 def write_profile_ini() -> Path:
     """The port's configuration, written to the USER root where it overrides the install's Hitman2.ini
     (the install is never modified). Only keys that must differ from the original are changed:
@@ -47,7 +50,8 @@ def write_profile_ini() -> Path:
     out, seen = [], set()
     for line in (GAME_DIR / "Hitman2.ini").read_text(encoding="latin-1").splitlines():
         key = line.split()[0] if line.split() else ""
-        if key == "DrawDll": line = "DrawDll RenderOpenGL.dll"
+        if line.startswith("DefaultScene=") and SCENE_OVERRIDE: line = f"DefaultScene={SCENE_OVERRIDE}"
+        elif key == "DrawDll": line = "DrawDll RenderOpenGL.dll"
         elif key == "Window": line = "Window 1"
         elif key == "Resolution": line = f"Resolution {res}"
         seen.add(key); out.append(line)
@@ -182,11 +186,14 @@ def main() -> int:
     ap.add_argument("--trace", action="store_true", help="log every import call")
     ap.add_argument("--calls", action="store_true", help="list imports called, with counts")
     ap.add_argument("--no-build", action="store_true")
+    ap.add_argument("--scene", help="start in this scene instead of the logos, e.g. C0-1/C0-1__LOAD.gms")
     ap.add_argument("--shot", type=int, action="append", default=[], metavar="FRAME", help="(with --android) render with real GLES 3 and save this frame as a PNG")
     ap.add_argument("--watch-mem", action="append", default=[], metavar="HEXADDR", help="log each change of this guest dword (checked at every dispatch)")
     ap.add_argument("--watch-ret", action="append", default=[], metavar="HEXVA", help="log whenever something is entered with this return address")
     ap.add_argument("--watch", action="append", default=[], metavar="HEXVA", help="log registers each time this guest address is entered")
     args = ap.parse_args()
+    global SCENE_OVERRIDE
+    SCENE_OVERRIDE = args.scene
     if not GAME_EXE.exists():
         print(f"game executable not found: {GAME_EXE}"); return 2
     exe = OUT / "h2_boot.exe" if args.no_build else build()
