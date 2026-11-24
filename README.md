@@ -2,9 +2,9 @@
 
 Port experimental nativo ARM64 de **Hitman 2: Silent Assassin** (PC, 2002, motor Glacier), mediante recompilación estática con [PCRecomp](https://github.com/sp00nznet/pcrecomp). Sin Wine, Winlator ni streaming.
 
-**Estado: Parcial / preview — 17 de noviembre de 2026.** Se ha llegado al menú principal y al tutorial con gráficos, audio y entrada táctil en un Samsung Galaxy S25 Ultra (SM-S938B). No se ha validado el juego completo. La corrección más reciente del cursor y los perfiles gráficos nuevos están compilados, pero su prueba en dispositivo sigue pendiente.
+**Estado: Parcial / preview — 24 de noviembre de 2026.** El juego arranca, muestra el menú principal y la primera misión (el tutorial del cobertizo) con gráficos, audio, controles táctiles y mando, **comprobado en dos teléfonos**: Samsung Galaxy S25 Ultra (Adreno 830, 120 fps estables) y Xiaomi Redmi Note 8 (Adreno 610, 52–60 fps según la resolución). No se ha validado el juego completo: faltan guardar/cargar de extremo a extremo, el resto de misiones y probar el mando con un mando real.
 
-**[Descargar APK v0.2.0-preview.1](https://github.com/codepdbh/hitman2-android-evolved/releases/tag/v0.2.0-preview.1)** · [Todas las releases](https://github.com/codepdbh/hitman2-android-evolved/releases) · [Estado y evidencia](docs/STATUS.md)
+**[Descargar APK v0.3.0-preview.1](https://github.com/codepdbh/hitman2-android-evolved/releases/tag/v0.3.0-preview.1)** · [Todas las releases](https://github.com/codepdbh/hitman2-android-evolved/releases) · [Estado y evidencia](docs/STATUS.md) · [Qué seguirá mejorando](#qué-seguirá-mejorando)
 
 ## Antes de empezar
 
@@ -35,11 +35,11 @@ Puedes comparar los tuyos en PowerShell con `Get-FileHash -Algorithm SHA256 -Lit
 
 ### 1. Instala el APK
 
-1. Abre la [release](https://github.com/codepdbh/hitman2-android-evolved/releases/tag/v0.2.0-preview.1) y descarga el archivo `Hitman2-AndroidEvolved-v0.2.0-preview.1-arm64.apk` de **Assets**. Los archivos «Source code» son el código fuente, no la app.
+1. Abre la [release](https://github.com/codepdbh/hitman2-android-evolved/releases/tag/v0.3.0-preview.1) y descarga el archivo `Hitman2-AndroidEvolved-v0.3.0-preview.1-arm64.apk` de **Assets**. Los archivos «Source code» son el código fuente, no la app.
 2. Abre el APK en el teléfono. Si Android lo solicita, permite instalar aplicaciones desde el navegador o gestor de archivos que estés usando.
 3. Si ya tienes una compilación anterior firmada con la misma clave, instala encima para conservar los datos. **Desinstalar borra el perfil privado y las partidas de la app.**
 
-Es un APK de desarrollo firmado para esta preview; no es una publicación de producción en Google Play. La release incluye `SHA256SUMS.txt` para comprobar la descarga.
+Es un APK de preview firmado con la clave de depuración pública de Android (la misma de v0.2.0-preview.1, así que se instala encima de aquella); no es una publicación de producción en Google Play. La release incluye `SHA256SUMS.txt` para comprobar la descarga.
 
 ### 2. Copia los archivos de tu instalación de PC
 
@@ -74,13 +74,39 @@ La ruta predeterminada en Android es:
 
 Los archivos deben estar directamente ahí: evita una carpeta adicional como `h2androidevolved/Hitman 2 Silent Assassin/`. También puedes elegir una carpeta existente distinta desde **Sistema → Cambiar carpeta** en el launcher.
 
+### Dónde están esos archivos en tu PC
+
+Necesitas **la carpeta de instalación del juego**, la que contiene `hitman2.exe`. Según cómo lo tengas:
+
+| Tu copia | Cómo llegar a la carpeta |
+|---|---|
+| **Steam** | Biblioteca → clic derecho en *Hitman 2: Silent Assassin* → **Administrar → Explorar archivos locales** |
+| **GOG** | GOG Galaxy → el juego → **Administrar instalación → Mostrar carpeta** (o la carpeta que elegiste en el instalador) |
+| **CD/DVD original** | Instálalo en el PC y usa la carpeta de instalación (la que eligió el instalador). Copiar directamente el disco **no** sirve |
+| **Ya lo tenías instalado** | Busca `hitman2.exe` con el buscador de Windows; la carpeta donde está es la que buscas |
+
+Qué copiar y qué dejar:
+
+| Copiar al teléfono | No hace falta copiar |
+|---|---|
+| `hitman2.exe`, `RenderOpenGL.dll`, `Hitman2.ini`, `keyboard.cfg`, `streams.wav` | `config.exe`, el desinstalador, `RenderD3D.dll` y las demás DLL (`eax.dll`, `msvcrt.dll`…): el port aporta sus propias versiones |
+| la carpeta **`Scenes`** completa (unos 400 MB) | `Save` (las partidas de PC no se han probado importar), capturas, `Readme.rtf`, `INSTALL.LOG` |
+
+La edición de referencia ocupa unos **510 MB** en total. Formas de pasarlos al teléfono:
+
+1. **Cable USB** (lo más simple): conecta el teléfono, elige *Transferencia de archivos* y arrastra los archivos a `h2androidevolved` desde el explorador de Windows.
+2. **Nube o red local** (Drive, OneDrive, un recurso compartido…): sube la carpeta, descárgala en el teléfono con la app de archivos y colócala en `h2androidevolved`. Comprueba que `Scenes` conserve sus subcarpetas y que los `.ZIP` no se hayan descomprimido ni renombrado.
+3. **ADB** (para desarrollo): ver la alternativa más abajo.
+
+Después, en el launcher: **Sistema → Verificar archivos**. Debe decir **Listo para jugar**. Si tu copia es de otra edición, compara los hashes de la sección «Binarios de referencia»: si no coinciden, puede no funcionar.
+
 ### 3. Autoriza los archivos y entra al juego
 
 1. Abre **Hitman 2 AE**.
 2. Pulsa **Permitir acceso** o entra en **Sistema → Permiso de acceso a archivos**. En los ajustes de Android habilita **Permitir acceso para administrar todos los archivos** para esta app y vuelve al launcher.
 3. Pulsa **Sistema → Verificar archivos**. Si faltan archivos, revisa la ruta y termina de copiar `Scenes`.
 4. Cuando aparezca **Listo para jugar**, pulsa **Jugar**. Por defecto se omiten los logos y se abre el menú principal.
-5. Usa la cruceta y **Aceptar** para navegar. En el menú del juego puedes empezar una partida o cargar una guardada por el port. La selección directa con el puntero tiene una corrección nueva pendiente de validar.
+5. Usa la cruceta y **Aceptar** para navegar. En el menú del juego puedes empezar una partida o cargar una guardada por el port. Tocar un elemento del menú mueve el cursor del juego hasta él y pulsa.
 
 El port lee los originales del teléfono y escribe el perfil y las partidas en el almacenamiento privado de la app. No modifica tu instalación de PC.
 
@@ -91,7 +117,7 @@ Es opcional; la transferencia USB anterior no necesita depuración USB. Si ya ti
 ```powershell
 $gameCopy = 'C:\Juegos\Hitman 2 Silent Assassin'
 adb devices
-adb install -r '.\Hitman2-AndroidEvolved-v0.2.0-preview.1-arm64.apk'
+adb install -r '.\Hitman2-AndroidEvolved-v0.3.0-preview.1-arm64.apk'
 adb shell mkdir -p /sdcard/h2androidevolved
 adb push "$gameCopy\hitman2.exe" "$gameCopy\RenderOpenGL.dll" "$gameCopy\Hitman2.ini" "$gameCopy\keyboard.cfg" "$gameCopy\streams.wav" /sdcard/h2androidevolved/
 adb push "$gameCopy\Scenes" /sdcard/h2androidevolved/
@@ -111,9 +137,11 @@ En el launcher puedes ajustar sensibilidad de cámara, tamaño/visibilidad de bo
 
 **Idiomas:** Español / English cambia launcher, botones y ayuda. El idioma del juego depende de sus datos: con la copia española disponible, el juego sigue en español. Esta preview no incluye los recursos ingleses.
 
+**Resolución y rendimiento:** **Audio / GPU → Resolución interna**. Por defecto es *Ajustada a la pantalla* (720 líneas, p. ej. 1560×720): llena toda la pantalla sin bordes negros y el juego dibuja una vista más ancha. Medido en la misión 1: Galaxy S25 Ultra 120 fps en 800×450 y 1280×720 y 104–120 en 1560×720; **Redmi Note 8: 60 fps a 800×450, ~53 a 1280×720 y ~52 a 1560×720**. Si tu teléfono va por debajo de 60, baja la resolución. La imagen se dibuja con suavizado 4x y con la rampa de gamma del propio juego.
+
 **Gráficos:** empieza con **Audio / GPU → Perfil gráfico → Automático**. Los perfiles Mali y Unisoc son experimentales; Snapdragon/Adreno también tiene un perfil explícito. Todos usan el **driver OpenGL ES de Android**: no instalan Turnip ni otros drivers externos. El modo de menor profundidad puede reducir la precisión visual. La información del GPU y driver aparece después de iniciar el juego.
 
-**Mandos:** todavía no hay mapeo jugable de mandos USB/Bluetooth. Que Android detecte un mando no significa que el juego lo admita.
+**Mandos:** hay mapeo para mandos que Android reconozca como gamepad (stick izquierdo mover, derecho cámara, R2/R1 disparar, L2 correr, A acción, B agacharse, X recargar, Y inventario, L1 sigilo, Start pausa, Select mapa; en menús cruceta, A aceptar, B atrás). **Está implementado pero no se ha probado con un mando real.**
 
 Más detalles: [launcher](docs/LAUNCHER.md) · [controles táctiles](docs/TOUCH_CONTROLS.md).
 
@@ -125,10 +153,26 @@ Más detalles: [launcher](docs/LAUNCHER.md) · [controles táctiles](docs/TOUCH_
 | «Falta permiso» | Habilitar el acceso a todos los archivos para **Hitman 2 AE** y volver al launcher |
 | Error al cargar la biblioteca | Teléfono ARM64; APK ARM64; revisar el mensaje mostrado y los requisitos de GLES 3 |
 | Pantalla negra o parada del motor | Esta edición del juego puede ser distinta; comparar hashes. Cerrar la app por completo antes de volver a iniciar un motor detenido |
-| El puntero del menú no selecciona | Usar cruceta y Aceptar; la corrección de clic/arrastre más reciente sigue pendiente de prueba física |
+| El puntero del menú no cae donde tocas | Usar la cruceta y Aceptar mientras tanto; avisa en qué pantalla pasa |
 | Se ve mal con un perfil GPU | Volver a Automático y arrancar de nuevo el motor; Mali y Unisoc aún no tienen validación en hardware |
 
 La suspensión y reentrada conservando la superficie se comprobaron en un caso del S25. No hay recuperación automática de una misión si Android termina el proceso. Tampoco se han validado todas las misiones, guardar/cargar de extremo a extremo ni el rendimiento sostenido. Consulta [problemas conocidos](docs/KNOWN_ISSUES.md) y [evidencia de esta versión](docs/evidence/launcher_2026-11-17.md).
+
+## Qué seguirá mejorando
+
+Lo que no está hecho o no está comprobado, en lenguaje llano (el detalle técnico está en [problemas conocidos](docs/KNOWN_ISSUES.md) y [estado](docs/STATUS.md)):
+
+- **Guardar y cargar partidas:** las llamadas del sistema que hacen falta existen, pero no se ha probado guardar y cargar una partida completa.
+- **Más misiones:** solo se ha jugado el tutorial. Las demás cargan por la misma ruta, pero no se han recorrido.
+- **Mandos:** implementados, sin probar con un mando físico.
+- **Más teléfonos y GPU:** probado solo en Adreno 830 y Adreno 610. Hay perfiles para Mali y Unisoc y una escalera de sombreadores de respaldo, sin validar en esos chips.
+- **Rendimiento:** a 60 Hz en gama baja va justo; se puede agrupar el dibujado y optimizar el código recompilado.
+- **Sonido:** hay mezclador con atenuación y panorama por distancia, pero sin Doppler ni los efectos ambientales EAX del original. No se ha comparado el audio con el de PC.
+- **Imagen:** se aplica la gamma del juego; falta comparar con capturas del original y revisar las sombras y reflejos.
+- **Excepciones del programa original:** el manejo estructurado de excepciones (SEH/C++) no está implementado; si el juego lo necesita, se detiene indicando qué falta.
+- **Idioma:** el launcher está en español e inglés; el idioma del juego depende de los datos que copies.
+- **Reanudar:** al volver a la app se conserva la sesión, pero no se recupera una misión si Android mata el proceso.
+- **Otras ediciones del juego:** solo la edición de referencia está verificada.
 
 ## Desarrollo y comprobaciones
 
