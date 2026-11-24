@@ -192,17 +192,70 @@ static GLuint compile(GLenum type, const char *src)
     return s;
 }
 
-static int build_program(void)
+/* Copy of `src` with the first occurrence of `from` replaced by `to` (malloc'd; the caller frees). */
+static char *replace_once(const char *src, const char *from, const char *to)
 {
-    GLuint vs = compile(GL_VERTEX_SHADER, k_vs), fs = compile(GL_FRAGMENT_SHADER, k_fs);
-    if (!vs || !fs) return -1;
-    g_prog = glCreateProgram();
-    glAttachShader(g_prog, vs); glAttachShader(g_prog, fs);
-    glLinkProgram(g_prog);
-    GLint ok = 0; glGetProgramiv(g_prog, GL_LINK_STATUS, &ok);
-    if (!ok) { char log[2048]; glGetProgramInfoLog(g_prog, sizeof log, 0, log); H2_ERROR(H2_LOG_GRAPHICS, "GLES program link failed: %s", log); return -1; }
+    const char *at = strstr(src, from);
+    size_t n = strlen(src), lf = strlen(from), lt = strlen(to);
+    char *out = (char *)malloc(n - (at ? lf : 0) + (at ? lt : 0) + 1);
+    if (!out) return 0;
+    if (!at) { memcpy(out, src, n + 1); return out; }
+    memcpy(out, src, (size_t)(at - src)); memcpy(out + (at - src), to, lt); memcpy(out + (at - src) + lt, at + lf, n - (size_t)(at - src) - lf + 1);
+    return out;
+}
+
+static int g_shader_variant;
+
+/* Shader variants, most faithful first. A driver that rejects one is not abandoned: the next, more conservative
+ * variant is tried, and the one in use is logged and shown in the GPU info.
+ *   0  full: invariant position (stable depth for decals/shadows), highp fragment math, 8 lights
+ *   1  as 0 without the `invariant` qualifier (some drivers refuse or mis-handle it)
+ *   2  as 1 with mediump fragment math and 4 lights (visibly reduced: last resort, reported as such) */
+static int try_variant(int v)
+{
+    char *vs_src = replace_once(k_vs, v >= 1 ? "invariant gl_Position;\n" : "\x01", "");
+    char *fs_src = replace_once(k_fs, v >= 2 ? "precision highp float;" : "\x01", "precision mediump float;");
+    if (vs_src && v >= 2) { char *t = replace_once(vs_src, "i < 8; i++) { if (u_l_on[i] == 0)", "i < 4; i++) { if (u_l_on[i] == 0)"); free(vs_src); vs_src = t; }
+    GLuint vs = vs_src ? compile(GL_VERTEX_SHADER, vs_src) : 0, fs = fs_src ? compile(GL_FRAGMENT_SHADER, fs_src) : 0;
+    free(vs_src); free(fs_src);
+    if (!vs || !fs) { if (vs) glDeleteShader(vs); if (fs) glDeleteShader(fs); return -1; }
+    GLuint p = glCreateProgram();
+    glAttachShader(p, vs); glAttachShader(p, fs);
+    glLinkProgram(p);
+    glDeleteShader(vs); glDeleteShader(fs);
+    GLint ok = 0; glGetProgramiv(p, GL_LINK_STATUS, &ok);
+    if (!ok) { char log[2048]; glGetProgramInfoLog(p, sizeof log, 0, log); H2_ERROR(H2_LOG_GRAPHICS, "GLES program link failed (variant %d): %s", v, log); glDeleteProgram(p); return -1; }
+    g_prog = p;
     for (int i = 0; i < uCOUNT; i++) U[i] = glGetUniformLocation(g_prog, k_unames[i]);
     return 0;
+}
+
+static int build_program(void)
+{
+    /* The compatibility profiles (1 Mali, 2 Unisoc) start one step down: they exist for drivers that need it. */
+    int start = (g_profile == 1 || g_profile == 2) ? 1 : 0;
+    for (int v = start; v <= 2; v++) {
+        if (try_variant(v) == 0) {
+            g_shader_variant = v;
+            if (v == 2) H2_WARN(H2_LOG_GRAPHICS, "GLES shader variant 2 (reduced: mediump, 4 lights) is in use: the driver rejected the full shaders");
+            else H2_INFO(H2_LOG_GRAPHICS, "GLES shader variant %d in use", v);
+            return 0;
+        }
+        H2_WARN(H2_LOG_GRAPHICS, "GLES shader variant %d failed on this driver%s", v, v < 2 ? ": trying a more conservative one" : "");
+    }
+    return -1;
+}
+
+/* What the driver offers, for the log and the launcher's GPU info (facts read from the driver, no vendor guesses). */
+static void log_driver_caps(void)
+{
+    GLint vu = 0, vv = 0, fu = 0, range[2] = { 0, 0 }, prec = 0;
+    glGetIntegerv(GL_MAX_VERTEX_UNIFORM_VECTORS, &vu); glGetIntegerv(GL_MAX_VARYING_VECTORS, &vv);
+    glGetIntegerv(GL_MAX_FRAGMENT_UNIFORM_VECTORS, &fu);
+    glGetShaderPrecisionFormat(GL_FRAGMENT_SHADER, GL_HIGH_FLOAT, range, &prec);
+    H2_INFO(H2_LOG_GRAPHICS, "GLES driver: %s | max vertex uniform vectors %d, fragment %d, varyings %d, highp fragment %s (precision bits %d)",
+            (const char *)glGetString(GL_SHADING_LANGUAGE_VERSION), vu, fu, vv, prec ? "yes" : "NO", prec);
+    if (vu < 96) H2_WARN(H2_LOG_GRAPHICS, "GLES driver offers only %d vertex uniform vectors: the lighting shader needs about 80", vu);
 }
 
 /* ---------------- textures ---------------- */
@@ -428,7 +481,11 @@ static int gb_init(int w, int h)
     pthread_mutex_unlock(&g_info_lock);
     H2_INFO(H2_LOG_GRAPHICS, "graphics profile %d: depth=%d stencil=%d max_texture=%d units=%d", g_profile, actual_depth, actual_stencil, max_texture, texture_units);
     if (g_native_window) eglSwapInterval(g_dpy, 1);         /* pace to the display: the game would otherwise run at hundreds of fps */
+    log_driver_caps();
     if (build_program() != 0) return -1;
+    pthread_mutex_lock(&g_info_lock);
+    { size_t used = strlen(g_info); snprintf(g_info + used, sizeof g_info - used, "%cShader variant %d%s", 10, g_shader_variant, g_shader_variant == 2 ? " (reduced)" : ""); }
+    pthread_mutex_unlock(&g_info_lock);
     glGenVertexArrays(1, &g_vao); glGenBuffers(1, &g_vbo); glGenBuffers(1, &g_ebo);
     glBindVertexArray(g_vao); glBindBuffer(GL_ARRAY_BUFFER, g_vbo);
     const GLsizei stride = sizeof(H2GLVertex);
@@ -480,6 +537,10 @@ static void gb_present(void)
     if (g_cap_path[0] && g_frame >= g_cap_frame && g_draws_this_frame > 0) { write_ppm(g_cap_path); g_cap_path[0] = 0; }
     g_draws_this_frame = 0;
     g_present_error = 0;
+    {   /* Tile-based GPUs (Mali, Adreno, PowerVR) need not write depth/stencil back to memory: say so before the swap. */
+        const GLenum discard[2] = { GL_DEPTH, GL_STENCIL };
+        glInvalidateFramebuffer(GL_FRAMEBUFFER, 2, discard);
+    }
     if (!eglSwapBuffers(g_dpy, g_surf)) {
         g_present_error = eglGetError();
         H2_ERROR(H2_LOG_GRAPHICS, "eglSwapBuffers failed: 0x%X", g_present_error);

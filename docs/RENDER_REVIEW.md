@@ -45,3 +45,23 @@ otros números para comparar).
    agrupar si el teléfono no mantiene la fluidez.
 
 Nada de esto cambia los resultados de las pruebas diferenciales ni el código recompilado.
+
+## Soporte de drivers de GPU (2026-11-24)
+
+**Estado: Compilado; sin probar en el teléfono.** Lo único que se ha ejecutado de verdad en una GPU es el S25 (el mismo
+sombreador completo de siempre); los cambios siguientes no se han ejecutado en ningún dispositivo.
+
+Hecho (todo basado en lo que el driver informa, sin tablas de «manías» por fabricante que no se han medido):
+
+1. **Escalera de sombreadores** (`renderer/gl_gles3_backend.c`): variante 0 completa; 1 sin `invariant`; 2 reducida (`mediump`
+   en fragmento y 4 luces, avisada como degradada). Si un driver rechaza una variante al compilar o enlazar se prueba la
+   siguiente en vez de abandonar. Los perfiles de compatibilidad (1 Mali, 2 Unisoc) arrancan en la variante 1. La variante en
+   uso se registra y aparece en la información de GPU del launcher.
+2. **Informe de capacidades del driver** al arrancar: versión de GLSL, vectores uniformes de vértice y fragmento, varyings,
+   y si hay `highp` en fragmento; avisa si hay menos de 96 vectores uniformes de vértice (el sombreador necesita unos 80).
+3. **`glInvalidateFramebuffer` de profundidad y stencil antes de cada presentación**: en GPU de teselas (Mali, Adreno, PowerVR)
+   evita escribirlos a memoria; en el resto no hace nada.
+4. Multimuestreo 4x si la configuración existe y, si no, la selección anterior (arriba).
+
+No hecho: cambios por GPU concretos, caché de estado de texturas para reducir sobrecarga del driver, y pruebas en Mali, PowerVR
+o Unisoc reales. Para añadirlos hace falta un dispositivo con esa GPU y su registro (`GLES driver:` y `shader variant`).
