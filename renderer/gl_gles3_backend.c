@@ -47,6 +47,32 @@ static uint64_t g_frame;
 static char g_cap_path[260];
 static uint64_t g_cap_frame;
 static unsigned g_draws_this_frame;
+
+/* The last small draw of a frame (at most 8 vertices) and where it landed, in picture pixels (origin top-left): in
+ * the menus that is the mouse cursor sprite, drawn after everything else. Lets the touch layer move the cursor
+ * closed-loop instead of guessing the game's mouse acceleration. Published once per presented frame. */
+static volatile int g_probe_x = -1, g_probe_y = -1, g_probe_frame;
+static int g_small_x = -1, g_small_y = -1;
+
+static void note_small_draw(const H2GLState *s, const H2GLVertex *v, unsigned n)
+{
+    float minx = 1e30f, miny = 1e30f;
+    for (unsigned i = 0; i < n; i++) {
+        float p[4], q[4];
+        for (int r = 0; r < 4; r++) p[r] = s->modelview.m[r] * v[i].pos[0] + s->modelview.m[4 + r] * v[i].pos[1] + s->modelview.m[8 + r] * v[i].pos[2] + s->modelview.m[12 + r] * v[i].pos[3];
+        for (int r = 0; r < 4; r++) q[r] = s->projection.m[r] * p[0] + s->projection.m[4 + r] * p[1] + s->projection.m[8 + r] * p[2] + s->projection.m[12 + r] * p[3];
+        if (q[3] == 0.0f) return;
+        float nx = q[0] / q[3], ny = q[1] / q[3];
+        float px = (nx * 0.5f + 0.5f) * (float)s->viewport[2] + (float)s->viewport[0];
+        float py = (1.0f - (ny * 0.5f + 0.5f)) * (float)s->viewport[3] - (float)s->viewport[1];
+        if (px < minx) minx = px;
+        if (py < miny) miny = py;
+    }
+    g_small_x = (int)minx; g_small_y = (int)miny;
+}
+
+/* Position of the last small draw of the last presented frame, or -1,-1 if there was none. */
+int h2_gles3_cursor_probe(int *x, int *y) { *x = g_probe_x; *y = g_probe_y; return g_probe_x >= 0; }
 static int g_profile;
 static pthread_mutex_t g_info_lock = PTHREAD_MUTEX_INITIALIZER;
 static char g_info[768] = "GPU information available after starting the game.";
@@ -664,6 +690,7 @@ static void gb_present(void)
     if (g_use_fbo) post_pass();
     /* capture the first frame at or after the requested one that actually drew something (most frames are bare clears) */
     if (g_cap_path[0] && g_frame >= g_cap_frame && g_draws_this_frame > 0) { write_ppm(g_cap_path); g_cap_path[0] = 0; }
+    g_probe_x = g_small_x; g_probe_y = g_small_y; g_small_x = g_small_y = -1;
     g_draws_this_frame = 0;
     g_present_error = 0;
     {   /* Tile-based GPUs (Mali, Adreno, PowerVR) need not write depth/stencil back to memory: say so before the swap. */
@@ -691,6 +718,7 @@ static void gb_clear(uint32_t mask, const float color[4], double depth, int sten
 static void gb_draw(const H2GLState *s, H2GLPrim prim, const H2GLVertex *v, unsigned nverts, const uint32_t *idx, unsigned nidx)
 {
     g_draws_this_frame++;
+    if (nverts <= 8) note_small_draw(s, v, nverts);
     apply_fixed_state(s);
     upload_uniforms(s);
     for (int u = 0; u < 2; u++) if (s->tex[u].enabled) bind_unit(u, s->tex[u].bound);

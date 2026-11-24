@@ -309,3 +309,13 @@ JNIEXPORT void JNICALL Java_com_h2ae_android_NativeBridge_inputReset(JNIEnv *e, 
 
 /* 0 boot, 1 intro/logos, 2 menu, 3 mission: see platform/game_context.c */
 JNIEXPORT jint JNICALL Java_com_h2ae_android_NativeBridge_gameContext(JNIEnv *e, jobject t) { (void)e; (void)t; return h2_game_context(); }
+
+
+/* Where the menu cursor sprite was drawn in the last frame (picture pixels), packed as (x << 16) | y; -1 if unknown. */
+JNIEXPORT jint JNICALL Java_com_h2ae_android_NativeBridge_menuCursorPos(JNIEnv *e, jobject t)
+{
+    int x, y;
+    (void)e; (void)t;
+    if (!h2_gles3_cursor_probe(&x, &y) || x < 0 || y < 0 || x > 32767 || y > 32767) return -1;
+    return (jint)(((unsigned)x << 16) | (unsigned)y);
+}

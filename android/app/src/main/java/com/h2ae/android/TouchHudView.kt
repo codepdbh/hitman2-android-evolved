@@ -68,8 +68,9 @@ class TouchHudView(context: Context) : View(context) {
         const val N1 = 0x02; const val N2 = 0x03; const val N3 = 0x04; const val N4 = 0x05; const val N5 = 0x06; const val N6 = 0x07; const val N7 = 0x08
         const val NUM1 = 0x4F; const val NUM3 = 0x51
         const val MIN_PRESS_MS = 60L          // a tap must last long enough for the game's per-frame polling to see it
-        const val MENU_MOUSE_SPEED = 2.7126f         // measured on the S25: the menu cursor moves 2.0x (Hitman2.ini MouseSpeed 1.356 x 2) per mouse unit
-        const val MENU_CLICK_DELAY = 190L           // after the cursor warp (home 0 ms, move 90 ms) has been consumed
+        const val MENU_CLICK_DELAY = 80L            // after the cursor has arrived, so the hover is applied before the click
+        const val MENU_SEEK_MS = 50L               // time between nudges: the sprite must have been redrawn
+        const val MENU_SEEK_TOLERANCE = 5          // pixels
     }
 
     private val buttons = listOf(
@@ -422,21 +423,40 @@ class TouchHudView(context: Context) : View(context) {
     }
 
     /**
-     * Moves the game's menu cursor to a point of the game picture. The menus read the mouse through DirectInput as
-     * RELATIVE motion (and use GetCursorPos only in some modes), so the cursor is pushed into the top-left corner
-     * (the game clamps it to the screen), that motion is left to be consumed, and then it is moved by
-     * (target / MouseSpeed) from there. The absolute position is sent too, for the path that asks the system.
+     * Menu cursor, closed loop. The menus read the mouse as RELATIVE DirectInput motion and the game applies its own
+     * (non-linear) acceleration, so a position cannot be reached by computing how much to move. Instead the renderer
+     * reports where the cursor sprite was drawn in the last frame (NativeBridge.menuCursorPos) and the cursor is
+     * nudged toward the target, one small step per ~50 ms, until it is within a few pixels (or after 40 tries).
      */
-    private fun warpMenuCursor(gx: Int, gy: Int) {
-        NativeBridge.inputCursor(gx, gy)
-        ui.postDelayed({ NativeBridge.inputMouseMove(-6000, -6000) }, 0)
-        ui.postDelayed({ NativeBridge.inputMouseMove((gx / MENU_MOUSE_SPEED).toInt(), (gy / MENU_MOUSE_SPEED).toInt()) }, 90)
+    private var seekToken = 0
+    private var lastSeekAt = 0L
+    private fun seekCursor(gx: Int, gy: Int, thenClick: Boolean) {
+        val token = ++seekToken
+        lastSeekAt = SystemClock.uptimeMillis()
+        var tries = 0
+        val step = object : Runnable {
+            override fun run() {
+                if (token != seekToken) return
+                val packed = NativeBridge.menuCursorPos()
+                if (packed == -1) { if (thenClick) menuClick(); return }          // the cursor cannot be seen: click where it is
+                val ex = gx - (packed ushr 16); val ey = gy - (packed and 0xFFFF)
+                if ((abs(ex) <= MENU_SEEK_TOLERANCE && abs(ey) <= MENU_SEEK_TOLERANCE) || tries++ >= 40) { if (thenClick) menuClick(); return }
+                fun units(e: Int): Int { val v = (e / 1.6f).toInt().coerceIn(-40, 40); return if (v == 0 && e != 0) Integer.signum(e) else v }
+                NativeBridge.inputMouseMove(units(ex), units(ey))
+                ui.postDelayed(this, MENU_SEEK_MS)
+            }
+        }
+        ui.post(step)
+    }
+    private fun menuClick() {
+        ui.postDelayed({ NativeBridge.inputMouseButton(0, true) }, MENU_CLICK_DELAY)
+        ui.postDelayed({ NativeBridge.inputMouseButton(0, false) }, MENU_CLICK_DELAY + MIN_PRESS_MS + 20)
     }
 
     /** The original menu calls GetCursorPos followed by ScreenToClient (guest 0041707B / 00417098). */
     private fun menuCursor(x: Float, y: Float) {
         val (gx, gy) = toGame(x, y)
-        NativeBridge.inputCursor(gx, gy)
+        if (SystemClock.uptimeMillis() - lastSeekAt > 120) seekCursor(gx, gy, false)    // hover while the finger moves
     }
 
     override fun onHoverEvent(event: MotionEvent): Boolean {
@@ -455,7 +475,7 @@ class TouchHudView(context: Context) : View(context) {
         if (isAttachedToWindow) ui.postDelayed(poll, 200)
         pressedAt.clear()
         pendingReleases.clear()
-        menuPointer = -1; menuRelease = null
+        menuPointer = -1; menuRelease = null; seekToken++
         editPointer = -1; editBtn = null
         cameraMotion.reset()
         if (NativeBridge.gameLoadError != null) return
@@ -569,7 +589,7 @@ class TouchHudView(context: Context) : View(context) {
                     if (menuPointer < 0 && gameRect.contains(x, y)) {
                         menuRelease?.let { ui.removeCallbacks(it) }; menuRelease = null
                         menuPointer = id; menuPressedAt = SystemClock.uptimeMillis()
-                        val (gx, gy) = toGame(x, y); warpMenuCursor(gx, gy)          // the highlight follows the finger
+                        val (gx, gy) = toGame(x, y); seekCursor(gx, gy, false)
                     }
                     return true
                 }
@@ -607,10 +627,7 @@ class TouchHudView(context: Context) : View(context) {
                 if (id == menuPointer) {
                     menuPointer = -1
                     val (gx, gy) = toGame(e.getX(i), e.getY(i))
-                    warpMenuCursor(gx, gy)                                         // final position, then the click once it has landed
-                    ui.postDelayed({ NativeBridge.inputMouseButton(0, true) }, MENU_CLICK_DELAY)
-                    val release = Runnable { NativeBridge.inputMouseButton(0, false); menuRelease = null }
-                    menuRelease = release; ui.postDelayed(release, MENU_CLICK_DELAY + MIN_PRESS_MS + 20)
+                    seekCursor(gx, gy, true)                                       // go to the final position, then click
                 }
                 if (id == joyPointer) releaseJoy()
                 if (id == lookPointer) {

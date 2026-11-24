@@ -10,9 +10,9 @@ internal object GameProfile {
             val key = setting.find(line)?.groupValues?.get(1)
             val canonical = overrides.keys.firstOrNull { it.equals(key, true) }
             if (canonical == null) out.add(line)
-            else remaining.remove(canonical)?.let { out.add(format(canonical, it)) }
+            else remaining.remove(canonical)?.let { if (it.isNotEmpty()) out.add(format(canonical, it)) }   // an empty value removes the option
         }
-        remaining.forEach { (key, value) -> out.add(format(key, value)) }
+        remaining.forEach { (key, value) -> if (value.isNotEmpty()) out.add(format(key, value)) }
         return out.joinToString("\r\n") + "\r\n"
     }
     private fun format(key: String, value: String) = if (key == "DefaultScene") "$key=$value" else "$key $value"

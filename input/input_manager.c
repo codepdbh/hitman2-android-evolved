@@ -76,6 +76,9 @@ void h2_input_key(unsigned dik, int down)
 void h2_input_mouse_move(int dx, int dy)
 {
     lock();
+    /* The system-cursor path (GetCursorPos) sees relative motion too: the cursor follows it, as a real mouse would. */
+    g_cx += dx; g_cy += dy;
+    if (g_cx < 0) g_cx = 0; if (g_cy < 0) g_cy = 0; if (g_cx > 8191) g_cx = 8191; if (g_cy > 8191) g_cy = 8191;
     g_dx += dx; g_dy += dy;
     if (dx) push(1, 0, (uint32_t)dx);                               /* DIMOFS_X */
     if (dy) push(1, 4, (uint32_t)dy);                               /* DIMOFS_Y */

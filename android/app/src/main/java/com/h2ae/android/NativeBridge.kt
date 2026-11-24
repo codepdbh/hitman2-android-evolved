@@ -42,6 +42,8 @@ object NativeBridge {
     external fun inputMouseMove(dx: Int, dy: Int)
     external fun inputMouseButton(index: Int, down: Boolean)
     external fun inputWheel(dz: Int)
+    /** Menu cursor sprite position in the last frame, picture pixels, packed (x shl 16) or y; -1 if unknown. */
+    external fun menuCursorPos(): Int
     external fun inputCursor(x: Int, y: Int)
     external fun inputReset()
 

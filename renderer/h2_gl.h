@@ -111,6 +111,7 @@ int h2_gles3_present_error(void);
 /* Before init: 0 auto, 1 Mali, 2 Unisoc, 3 Adreno. Uses the system GLES driver. */
 int h2_gles3_set_profile(int profile);
 void h2_gles3_description(char *out, unsigned capacity);
+int h2_gles3_cursor_probe(int *x, int *y);          /* last small draw of the last frame, in picture pixels; 0 if none */
 void h2_gles3_request_capture(const char *ppm_path, uint64_t frame);   /* write that presented frame as a PPM */
 #endif
 
