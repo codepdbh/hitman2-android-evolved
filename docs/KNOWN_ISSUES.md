@@ -1,5 +1,12 @@
 # Problemas conocidos y bloqueos
 
+## Imports de sistema completados (2026-11-24)
+
+- `tools/missing_imports.py`: **0 imports sin función nativa** en `hitman2.exe` y `RenderOpenGL.dll` (KERNEL32 106/106 y 51/51). Que exista la función no significa que su semántica sea completa:
+- **Compilado, no probado en ejecución** (las rutas de guardado de partida no se han ejercitado): `CreateDirectoryA`, `RemoveDirectoryA`, `MoveFileA`, `CopyFileA`, `GetFileTime`, `SetEndOfFile`, `GetDiskFreeSpaceExA` (volumen real del directorio de usuario), `GetDriveTypeA` / `GetLogicalDriveStringsA` (solo existe C:, sin unidad óptica), `CompareStringA/W` (ordinal; solo `NORM_IGNORECASE`, otras banderas paran el invitado), `VirtualQuery`, `ReadProcessMemory` (solo el proceso actual), átomos globales, conversión fecha/hora DOS (en UTC), `LocalFree`.
+- **Limitado:** `FormatMessageA` devuelve un texto genérico «Windows error N.» (no el texto de Windows) y solo admite mensajes del sistema; `SetConsoleCtrlHandler` y `SetStdHandle` aceptan y no hacen nada (no hay consola); `GetFileTime` da la misma hora para creación, acceso y escritura.
+- **Detienen el invitado por su nombre** (excepciones estructuradas sin implementar): `UnhandledExceptionFilter`, `RtlUnwind`, `RaiseException` salvo el nombre de hilo del depurador.
+
 ## Launcher, idioma, cursor y GPU (2026-11-17)
 
 - **Bloqueado (datos):** inglés dentro del juego; la copia disponible es española. Inglés/Español del launcher y HUD no cambia los recursos del juego.

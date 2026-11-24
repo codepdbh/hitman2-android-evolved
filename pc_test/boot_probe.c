@@ -141,6 +141,7 @@ int main(int argc, char **argv)
     h2_register_threads();
     h2_threads_set_runner(thread_runner);
     h2_register_files();
+    h2_register_system();
     h2_register_user32();
     h2_register_game_dlls();
     h2_register_dinput8();

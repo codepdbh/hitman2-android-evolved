@@ -47,7 +47,7 @@ if(H2_LIFTED AND EXISTS "${H2_ROOT}/recomp/generated/funcs_all.h")
         "${H2_ROOT}/runtime/guest_mem.c" "${H2_ROOT}/runtime/h2_runtime.c" "${H2_ROOT}/runtime/h2_dispatch.c"
         "${H2_ROOT}/platform/imports.c" "${H2_ROOT}/platform/pe_loader.c" "${H2_ROOT}/platform/guest_alloc.c"
         "${H2_ROOT}/platform/process.c" "${H2_ROOT}/platform/win32_kernel32.c" "${H2_ROOT}/platform/win32_objects.c"
-        "${H2_ROOT}/platform/game_context.c" "${H2_ROOT}/platform/win32_threads.c" "${H2_ROOT}/platform/win32_files.c" "${H2_ROOT}/platform/win32_user32.c"
+        "${H2_ROOT}/platform/game_context.c" "${H2_ROOT}/platform/win32_system.c" "${H2_ROOT}/platform/win32_threads.c" "${H2_ROOT}/platform/win32_files.c" "${H2_ROOT}/platform/win32_user32.c"
         "${H2_ROOT}/platform/game_dlls.c" "${H2_ROOT}/platform/dinput8.c" "${H2_ROOT}/platform/win32_advapi32.c"
         "${H2_ROOT}/platform/dsound.c" "${H2_ROOT}/audio/android_aaudio.c" "${H2_ROOT}/input/input_manager.c"
         "${H2_ROOT}/renderer/h2_gl.c" "${H2_ROOT}/renderer/gl_null_backend.c" "${H2_ROOT}/renderer/gl_gles3_backend.c"

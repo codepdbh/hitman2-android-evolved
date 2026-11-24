@@ -111,7 +111,7 @@ def sources(android: bool = False):
     rt, pf = ROOT / "runtime", ROOT / "platform"
     return [ROOT / "pc_test" / "boot_probe.c", rt / "guest_mem.c", rt / "h2_runtime.c", rt / "h2_dispatch.c",
             pf / "imports.c", pf / "pe_loader.c", pf / "guest_alloc.c", pf / "process.c", pf / "win32_kernel32.c",
-            pf / "win32_objects.c", pf / "win32_threads.c", pf / "win32_files.c", pf / "game_context.c", pf / "win32_user32.c", pf / "game_dlls.c", pf / "dinput8.c", pf / "win32_advapi32.c", pf / "dsound.c",
+            pf / "win32_objects.c", pf / "win32_threads.c", pf / "win32_files.c", pf / "game_context.c", pf / "win32_system.c", pf / "win32_user32.c", pf / "game_dlls.c", pf / "dinput8.c", pf / "win32_advapi32.c", pf / "dsound.c",
             ROOT / "input" / "input_manager.c", ROOT / "renderer" / "h2_gl.c", ROOT / "renderer" / "gl_null_backend.c"] + ([ROOT / "renderer" / "gl_gles3_backend.c"] if android else [])
 
 

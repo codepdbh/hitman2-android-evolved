@@ -141,7 +141,7 @@ static void *game_main(void *arg)
         H2_ERROR(H2_LOG_ANDROID, "%s", g_message); game_finished(); return 0;
     }
     h2_register_kernel32(); h2_register_objects(); h2_register_threads(); h2_threads_set_runner(thread_runner);
-    h2_register_files(); h2_register_user32(); h2_register_game_dlls(); h2_register_dinput8(); h2_register_advapi32(); h2_register_dsound();
+    h2_register_files(); h2_register_system(); h2_register_user32(); h2_register_game_dlls(); h2_register_dinput8(); h2_register_advapi32(); h2_register_dsound();
     h2_audio_set_backend(h2_audio_aaudio_backend());
     h2_gl_set_backend(h2_gl_gles3_backend());
     pthread_mutex_lock(&g_surface_lock);

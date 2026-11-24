@@ -135,6 +135,7 @@ void h2_register_threads(void);
 enum { H2_CTX_BOOT = 0, H2_CTX_INTRO = 1, H2_CTX_MENU = 2, H2_CTX_MISSION = 3 };
 void h2_game_context_note_open(const char *rel_path);
 int  h2_game_context(void);
+void h2_register_system(void);                            /* CompareString, VirtualQuery, atoms, FormatMessage, DOS time ... */
 void h2_register_objects(void);
 void h2_register_files(void);
 void h2_register_kernel32(void);

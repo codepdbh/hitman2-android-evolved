@@ -490,8 +490,160 @@ static uint32_t k_FindClose(CPU *c, const uint32_t *args)
     return 1;
 }
 
+/* ---- directories, moving, copying, times, size, free space ----
+ * Same rules as the rest of this layer: everything the guest creates or changes lives in the user root; the game
+ * install is read-only (changing or removing something there answers ACCESS_DENIED). */
+#if defined(_WIN32)
+extern int __stdcall GetDiskFreeSpaceExA(const char *, uint64_t *, uint64_t *, uint64_t *);
+#else
+#include <sys/statvfs.h>
+#endif
+
+static void to_filetime(uint64_t unix_s, uint32_t out)
+{
+    uint64_t ft = (unix_s + 11644473600ull) * 10000000ull;
+    wr32(out, (uint32_t)ft); wr32(out + 4, (uint32_t)(ft >> 32));
+}
+
+static uint32_t k_CreateDirectoryA(CPU *c, const uint32_t *args)
+{
+    UNUSED;
+    const char *guest = (const char *)guest_ptr(ARG(0));
+    char rel[520], user[920], game[920];
+    int is_dir = 0;
+    if (guest_to_rel(guest, rel, sizeof rel) != 0 || !rel[0]) { g_h2_last_error = ERR_PATH_NOT_FOUND; return 0; }
+    if (resolve(g_user_root, rel, user, sizeof user) || (resolve(g_game_root, rel, game, sizeof game) && host_exists(game, &is_dir))) {
+        g_h2_last_error = 183; return 0;                                           /* ERROR_ALREADY_EXISTS */
+    }
+    snprintf(user, sizeof user, "%s/%s", g_user_root, rel);
+    make_parents(user);
+    if (h2_mkdir(user) != 0) { g_h2_last_error = ERR_PATH_NOT_FOUND; return 0; }
+    H2_INFO(H2_LOG_FILESYSTEM, "created directory \"%s\" (user root)", rel);
+    return 1;
+}
+
+static uint32_t k_RemoveDirectoryA(CPU *c, const uint32_t *args)
+{
+    UNUSED;
+    const char *guest = (const char *)guest_ptr(ARG(0));
+    char rel[520], user[920], game[920];
+    if (guest_to_rel(guest, rel, sizeof rel) != 0 || !rel[0]) { g_h2_last_error = ERR_PATH_NOT_FOUND; return 0; }
+    if (resolve(g_game_root, rel, game, sizeof game)) { g_h2_last_error = ERR_ACCESS_DENIED; return 0; }
+    if (!resolve(g_user_root, rel, user, sizeof user)) { g_h2_last_error = ERR_PATH_NOT_FOUND; return 0; }
+#if defined(_WIN32)
+    if (_rmdir(user) != 0) { g_h2_last_error = 145; return 0; }                    /* ERROR_DIR_NOT_EMPTY */
+#else
+    if (rmdir(user) != 0) { g_h2_last_error = 145; return 0; }
+#endif
+    return 1;
+}
+
+static uint32_t k_MoveFileA(CPU *c, const uint32_t *args)
+{
+    UNUSED;
+    char rs[520], rd[520], src_user[920], src_game[920], dst[920], dst_game[920];
+    if (guest_to_rel((const char *)guest_ptr(ARG(0)), rs, sizeof rs) != 0 || guest_to_rel((const char *)guest_ptr(ARG(1)), rd, sizeof rd) != 0 || !rd[0]) {
+        g_h2_last_error = ERR_PATH_NOT_FOUND; return 0;
+    }
+    if (resolve(g_game_root, rs, src_game, sizeof src_game) && !resolve(g_user_root, rs, src_user, sizeof src_user)) { g_h2_last_error = ERR_ACCESS_DENIED; return 0; }
+    if (!resolve(g_user_root, rs, src_user, sizeof src_user)) { g_h2_last_error = ERR_FILE_NOT_FOUND; return 0; }
+    if (resolve(g_user_root, rd, dst, sizeof dst) || resolve(g_game_root, rd, dst_game, sizeof dst_game)) { g_h2_last_error = 183; return 0; }
+    snprintf(dst, sizeof dst, "%s/%s", g_user_root, rd);
+    make_parents(dst);
+    if (rename(src_user, dst) != 0) { g_h2_last_error = ERR_ACCESS_DENIED; return 0; }
+    H2_INFO(H2_LOG_FILESYSTEM, "moved \"%s\" -> \"%s\" (user root)", rs, rd);
+    return 1;
+}
+
+static uint32_t k_CopyFileA(CPU *c, const uint32_t *args)
+{
+    UNUSED;
+    char rs[520], rd[520], src[920], dst[920], dst_game[920];
+    if (guest_to_rel((const char *)guest_ptr(ARG(0)), rs, sizeof rs) != 0 || guest_to_rel((const char *)guest_ptr(ARG(1)), rd, sizeof rd) != 0 || !rd[0]) {
+        g_h2_last_error = ERR_PATH_NOT_FOUND; return 0;
+    }
+    if (!resolve(g_user_root, rs, src, sizeof src) && !resolve(g_game_root, rs, src, sizeof src)) { g_h2_last_error = ERR_FILE_NOT_FOUND; return 0; }
+    if (resolve(g_game_root, rd, dst_game, sizeof dst_game) && !resolve(g_user_root, rd, dst, sizeof dst)) {
+        if (ARG(2)) { g_h2_last_error = ERR_FILE_EXISTS; return 0; }               /* bFailIfExists */
+        g_h2_last_error = ERR_ACCESS_DENIED; return 0;                             /* would overwrite a game file */
+    }
+    if (resolve(g_user_root, rd, dst, sizeof dst) && ARG(2)) { g_h2_last_error = ERR_FILE_EXISTS; return 0; }
+    snprintf(dst, sizeof dst, "%s/%s", g_user_root, rd);
+    make_parents(dst);
+    if (copy_file(src, dst) != 0) { g_h2_last_error = ERR_ACCESS_DENIED; return 0; }
+    return 1;
+}
+
+/* BOOL GetFileTime(HANDLE, FILETIME *creation, FILETIME *access, FILETIME *write): the host keeps one
+ * modification time per file; it is reported for all three. */
+static uint32_t k_GetFileTime(CPU *c, const uint32_t *args)
+{
+    UNUSED;
+    H2Object *o = h2_handle_get(ARG(0), H2_OBJ_FILE);
+    struct stat st;
+    if (!o) { g_h2_last_error = ERR_INVALID_HANDLE; return 0; }
+    if (stat(o->u.file.host_path, &st) != 0) { g_h2_last_error = ERR_FILE_NOT_FOUND; return 0; }
+    for (int i = 1; i <= 3; i++) if (ARG(i)) to_filetime((uint64_t)st.st_mtime, ARG(i));
+    return 1;
+}
+
+/* BOOL SetEndOfFile(HANDLE): truncate or extend at the current file pointer */
+static uint32_t k_SetEndOfFile(CPU *c, const uint32_t *args)
+{
+    UNUSED;
+    H2Object *o = h2_handle_get(ARG(0), H2_OBJ_FILE);
+    if (!o) { g_h2_last_error = ERR_INVALID_HANDLE; return 0; }
+    if (!o->u.file.writable) { g_h2_last_error = ERR_ACCESS_DENIED; return 0; }
+    long long pos = (long long)h2_ftell64(o->u.file.fp);
+    fflush(o->u.file.fp);
+#if defined(_WIN32)
+    if (_chsize_s(_fileno(o->u.file.fp), pos) != 0) { g_h2_last_error = ERR_ACCESS_DENIED; return 0; }
+#else
+    if (ftruncate(fileno(o->u.file.fp), (off_t)pos) != 0) { g_h2_last_error = ERR_ACCESS_DENIED; return 0; }
+#endif
+    return 1;
+}
+
+/* BOOL GetDiskFreeSpaceExA(dir, *available, *total, *free): the host volume under the user root */
+static uint32_t k_GetDiskFreeSpaceExA(CPU *c, const uint32_t *args)
+{
+    UNUSED;
+    uint64_t avail = 0, total = 0, freeb = 0;
+#if defined(_WIN32)
+    if (!GetDiskFreeSpaceExA(g_user_root, &avail, &total, &freeb)) { g_h2_last_error = ERR_PATH_NOT_FOUND; return 0; }
+#else
+    struct statvfs sv;
+    if (statvfs(g_user_root, &sv) != 0) { g_h2_last_error = ERR_PATH_NOT_FOUND; return 0; }
+    avail = (uint64_t)sv.f_bavail * sv.f_frsize; total = (uint64_t)sv.f_blocks * sv.f_frsize; freeb = (uint64_t)sv.f_bfree * sv.f_frsize;
+#endif
+    if (ARG(1)) wr64(ARG(1), avail);
+    if (ARG(2)) wr64(ARG(2), total);
+    if (ARG(3)) wr64(ARG(3), freeb);
+    return 1;
+}
+
+/* Drives: the guest sees exactly one, C: (the fixed disk holding C:\Hitman2). No optical drive exists. */
+static uint32_t k_GetDriveTypeA(CPU *c, const uint32_t *args)
+{
+    UNUSED;
+    if (!ARG(0)) return 3;                                         /* DRIVE_FIXED: the current drive */
+    const char *p = (const char *)guest_ptr(ARG(0));
+    if ((p[0] == 'C' || p[0] == 'c') && p[1] == ':') return 3;
+    return 1;                                                      /* DRIVE_NO_ROOT_DIR */
+}
+static uint32_t k_GetLogicalDriveStringsA(CPU *c, const uint32_t *args)
+{
+    UNUSED;
+    static const char drives[5] = { 'C', ':', '\\', 0, 0 };
+    if (ARG(0) < 5) return 5;                                      /* required size, with the final NUL */
+    memcpy(guest_ptr(ARG(1)), drives, 5);
+    return 4;
+}
+
 static const H2ImportDef k_defs[] = {
 #define K(name, n) { "KERNEL32.dll", #name, n, k_##name }
+    K(CreateDirectoryA, 2), K(RemoveDirectoryA, 1), K(MoveFileA, 2), K(CopyFileA, 3), K(GetFileTime, 4), K(SetEndOfFile, 1),
+    K(GetDiskFreeSpaceExA, 4), K(GetDriveTypeA, 1), K(GetLogicalDriveStringsA, 2),
     K(FindFirstFileA, 2), K(FindNextFileA, 2), K(FindClose, 1),
     K(DeleteFileA, 1), K(CreateFileA, 7), K(ReadFile, 5), K(WriteFile, 5), K(SetFilePointer, 4), K(GetFileSize, 2), K(FlushFileBuffers, 1),
     K(GetCurrentDirectoryA, 2), K(SetCurrentDirectoryA, 1),
