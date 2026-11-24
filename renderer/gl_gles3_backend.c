@@ -19,6 +19,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <pthread.h>
 
 #include <EGL/egl.h>
@@ -37,6 +38,9 @@ static EGLSurface g_surf = EGL_NO_SURFACE;
 static EGLContext g_ctx = EGL_NO_CONTEXT;
 static EGLConfig g_config;
 static EGLint g_present_error;
+static GLuint g_scene_fbo;                    /* see "scene framebuffer" below */
+static int g_use_fbo, g_present_w, g_present_h;
+static void create_scene_fbo(int w, int h);
 static void *g_native_window;
 static int g_w, g_h;
 static uint64_t g_frame;
@@ -75,6 +79,9 @@ int h2_gles3_replace_native_window(void *window)
         g_surf = eglCreateWindowSurface(g_dpy, g_config, (EGLNativeWindowType)window, 0);
         if (g_surf == EGL_NO_SURFACE || !eglMakeCurrent(g_dpy, g_surf, g_surf, g_ctx)) goto failed;
         if (!eglSwapInterval(g_dpy, 1)) goto failed;
+        {   EGLint sw = 0, sh = 0; eglQuerySurface(g_dpy, g_surf, EGL_WIDTH, &sw); eglQuerySurface(g_dpy, g_surf, EGL_HEIGHT, &sh);
+            if (sw > 0 && sh > 0) { g_present_w = sw; g_present_h = sh; } }
+        if (g_use_fbo) glBindFramebuffer(GL_FRAMEBUFFER, g_scene_fbo);   /* a new surface starts on the default framebuffer */
     }
     g_present_error = 0;
     H2_INFO(H2_LOG_GRAPHICS, "EGL window %s; context and textures retained", window ? "reattached" : "detached");
@@ -427,17 +434,6 @@ static int try_surface_config(void *user, int depth, int stencil)
         EGL_RED_SIZE, 8, EGL_GREEN_SIZE, 8, EGL_BLUE_SIZE, 8, EGL_ALPHA_SIZE, 8,
         EGL_DEPTH_SIZE, depth, EGL_STENCIL_SIZE, stencil, EGL_NONE };
     EGLint count = 0;
-    {   /* Prefer a 4x multisampled surface (the game's ini asks for Antialias 4); without one, the plain surface below. */
-        const EGLint msaa[] = { EGL_RENDERABLE_TYPE, EGL_OPENGL_ES3_BIT,
-            EGL_SURFACE_TYPE, g_native_window ? EGL_WINDOW_BIT : EGL_PBUFFER_BIT,
-            EGL_RED_SIZE, 8, EGL_GREEN_SIZE, 8, EGL_BLUE_SIZE, 8, EGL_ALPHA_SIZE, 8,
-            EGL_DEPTH_SIZE, depth, EGL_STENCIL_SIZE, stencil, EGL_SAMPLE_BUFFERS, 1, EGL_SAMPLES, 4, EGL_NONE };
-        if (eglChooseConfig(g_dpy, msaa, (EGLConfig *)user, 1, &count) && count > 0) {
-            H2_INFO(H2_LOG_GRAPHICS, "EGL surface candidate depth=%d stencil=%d 4x MSAA: available", depth, stencil);
-            return 1;
-        }
-        count = 0;
-    }
     if (!eglChooseConfig(g_dpy, attr, (EGLConfig *)user, 1, &count)) {
         H2_ERROR(H2_LOG_GRAPHICS, "eglChooseConfig failed (0x%X)", eglGetError());
         return -1;
@@ -487,6 +483,9 @@ static int gb_init(int w, int h)
     { size_t used = strlen(g_info); snprintf(g_info + used, sizeof g_info - used, "%cShader variant %d%s", 10, g_shader_variant, g_shader_variant == 2 ? " (reduced)" : ""); }
     pthread_mutex_unlock(&g_info_lock);
     glGenVertexArrays(1, &g_vao); glGenBuffers(1, &g_vbo); glGenBuffers(1, &g_ebo);
+    {   EGLint sw = 0, sh = 0; eglQuerySurface(g_dpy, g_surf, EGL_WIDTH, &sw); eglQuerySurface(g_dpy, g_surf, EGL_HEIGHT, &sh);
+        g_present_w = sw > 0 ? sw : w; g_present_h = sh > 0 ? sh : h; }
+    create_scene_fbo(w, h);
     glBindVertexArray(g_vao); glBindBuffer(GL_ARRAY_BUFFER, g_vbo);
     const GLsizei stride = sizeof(H2GLVertex);
     glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, stride, (void *)offsetof(H2GLVertex, pos));
@@ -530,9 +529,139 @@ static void write_ppm(const char *path)
     H2_INFO(H2_LOG_GRAPHICS, "captured frame %llu to %s", (unsigned long long)g_frame, path);
 }
 
+/* ---------------- scene framebuffer + final pass (gamma ramp) ----------------
+ * The game sets a display gamma ramp (SetDeviceGammaRamp; its ini asks for GammaValue 0.63) that on Windows
+ * brightens the finished picture. Applying it per draw would be wrong for blended geometry, so the scene is drawn
+ * into a 4x multisampled framebuffer, resolved into a texture and copied to the screen through the ramp (a 256-entry
+ * lookup per channel). If the framebuffer cannot be created the game still renders, straight to the screen and
+ * without the ramp (logged). */
+static GLuint g_scene_color, g_scene_depth, g_resolve_fbo, g_resolve_tex, g_lut_tex, g_post_prog, g_post_vao;
+static int g_lut_dirty = 1;
+static uint16_t g_ramp[3][256];
+static int g_ramp_set;
+
+static const char *k_post_vs =
+"#version 300 es\n"
+"out vec2 v_uv;\n"
+"void main() { vec2 p = vec2(float((gl_VertexID << 1) & 2), float(gl_VertexID & 2)); v_uv = p; gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0); }\n";
+static const char *k_post_fs =
+"#version 300 es\n"
+"precision highp float;\n"
+"in vec2 v_uv; uniform sampler2D u_scene, u_lut; out vec4 o;\n"
+"void main() {\n"
+"  vec3 c = clamp(texture(u_scene, v_uv).rgb, 0.0, 1.0) * (255.0 / 256.0) + (0.5 / 256.0);\n"
+"  o = vec4(texture(u_lut, vec2(c.r, 0.5)).r, texture(u_lut, vec2(c.g, 0.5)).g, texture(u_lut, vec2(c.b, 0.5)).b, 1.0);\n"
+"}\n";
+
+static int build_post_program(void)
+{
+    GLuint vs = compile(GL_VERTEX_SHADER, k_post_vs), fs = compile(GL_FRAGMENT_SHADER, k_post_fs);
+    if (!vs || !fs) return -1;
+    g_post_prog = glCreateProgram();
+    glAttachShader(g_post_prog, vs); glAttachShader(g_post_prog, fs);
+    glLinkProgram(g_post_prog);
+    glDeleteShader(vs); glDeleteShader(fs);
+    GLint ok = 0; glGetProgramiv(g_post_prog, GL_LINK_STATUS, &ok);
+    if (!ok) { char log[1024]; glGetProgramInfoLog(g_post_prog, sizeof log, 0, log); H2_ERROR(H2_LOG_GRAPHICS, "post-process link failed: %s", log); return -1; }
+    glUseProgram(g_post_prog);
+    glUniform1i(glGetUniformLocation(g_post_prog, "u_scene"), 0);
+    glUniform1i(glGetUniformLocation(g_post_prog, "u_lut"), 1);
+    return 0;
+}
+
+static void upload_lut(void)
+{
+    uint8_t lut[256 * 4];
+    for (int i = 0; i < 256; i++) {
+        for (int ch = 0; ch < 3; ch++) lut[i * 4 + ch] = g_ramp_set ? (uint8_t)(g_ramp[ch][i] >> 8) : (uint8_t)i;
+        lut[i * 4 + 3] = 255;
+    }
+    if (!g_lut_tex) glGenTextures(1, &g_lut_tex);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, g_lut_tex);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 256, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, lut);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glActiveTexture(GL_TEXTURE0);
+    g_lut_dirty = 0;
+}
+
+static void create_scene_fbo(int w, int h)
+{
+    GLint max_samples = 0;
+    glGetIntegerv(GL_MAX_SAMPLES, &max_samples);
+    int samples = max_samples >= 4 ? 4 : max_samples;
+    glGenFramebuffers(1, &g_scene_fbo); glGenRenderbuffers(1, &g_scene_color); glGenRenderbuffers(1, &g_scene_depth);
+    glBindRenderbuffer(GL_RENDERBUFFER, g_scene_color);
+    glRenderbufferStorageMultisample(GL_RENDERBUFFER, samples, GL_RGBA8, w, h);
+    glBindRenderbuffer(GL_RENDERBUFFER, g_scene_depth);
+    glRenderbufferStorageMultisample(GL_RENDERBUFFER, samples, GL_DEPTH24_STENCIL8, w, h);
+    glBindFramebuffer(GL_FRAMEBUFFER, g_scene_fbo);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, g_scene_color);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, g_scene_depth);
+    GLenum st1 = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+    glGenTextures(1, &g_resolve_tex);
+    glBindTexture(GL_TEXTURE_2D, g_resolve_tex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glGenFramebuffers(1, &g_resolve_fbo);
+    glBindFramebuffer(GL_FRAMEBUFFER, g_resolve_fbo);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, g_resolve_tex, 0);
+    GLenum st2 = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+    glGenVertexArrays(1, &g_post_vao);
+    if (st1 != GL_FRAMEBUFFER_COMPLETE || st2 != GL_FRAMEBUFFER_COMPLETE || build_post_program() != 0) {
+        H2_WARN(H2_LOG_GRAPHICS, "scene framebuffer unavailable (status 0x%X / 0x%X): drawing straight to the screen, no gamma ramp", st1, st2);
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        g_use_fbo = 0;
+        return;
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER, g_scene_fbo);
+    g_use_fbo = 1;
+    H2_INFO(H2_LOG_GRAPHICS, "scene framebuffer %dx%d, %dx multisampled, resolved through the gamma ramp", w, h, samples);
+}
+
+/* Resolve the multisampled scene and copy it to the screen through the ramp. Leaves the scene framebuffer bound. */
+static void post_pass(void)
+{
+    glDisable(GL_SCISSOR_TEST);
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, g_scene_fbo);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, g_resolve_fbo);
+    glBlitFramebuffer(0, 0, g_w, g_h, 0, 0, g_w, g_h, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+    {   const GLenum discard[1] = { GL_DEPTH_STENCIL_ATTACHMENT };
+        glInvalidateFramebuffer(GL_READ_FRAMEBUFFER, 1, discard); }      /* tilers need not keep the multisampled depth */
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glViewport(0, 0, g_present_w, g_present_h);
+    glDisable(GL_DEPTH_TEST); glDisable(GL_BLEND); glDisable(GL_CULL_FACE);
+    if (g_lut_dirty) upload_lut();
+    glUseProgram(g_post_prog);
+    glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, g_resolve_tex);
+    glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D, g_lut_tex);
+    glActiveTexture(GL_TEXTURE0);
+    glBindVertexArray(g_post_vao);
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+    glBindVertexArray(g_vao);
+}
+
+static void report_fps(void)
+{
+    static struct timespec t0; static uint64_t f0;
+    struct timespec t;
+    clock_gettime(CLOCK_MONOTONIC, &t);
+    if (!t0.tv_sec && !t0.tv_nsec) { t0 = t; f0 = g_frame; return; }
+    double dt = (double)(t.tv_sec - t0.tv_sec) + (double)(t.tv_nsec - t0.tv_nsec) / 1e9;
+    if (dt >= 10.0) {
+        H2_INFO(H2_LOG_GRAPHICS, "frame rate: %.1f fps over %.1f s (%llu frames)", (double)(g_frame - f0) / dt, dt, (unsigned long long)(g_frame - f0));
+        t0 = t; f0 = g_frame;
+    }
+}
+
 static void gb_present(void)
 {
     g_frame++;
+    report_fps();
+    if (g_use_fbo) post_pass();
     /* capture the first frame at or after the requested one that actually drew something (most frames are bare clears) */
     if (g_cap_path[0] && g_frame >= g_cap_frame && g_draws_this_frame > 0) { write_ppm(g_cap_path); g_cap_path[0] = 0; }
     g_draws_this_frame = 0;
@@ -545,6 +674,7 @@ static void gb_present(void)
         g_present_error = eglGetError();
         H2_ERROR(H2_LOG_GRAPHICS, "eglSwapBuffers failed: 0x%X", g_present_error);
     }
+    if (g_use_fbo) glBindFramebuffer(GL_FRAMEBUFFER, g_scene_fbo);
 }
 static void gb_flush(void) { glFlush(); }
 
@@ -586,7 +716,11 @@ static void gb_draw_pixels(const H2GLState *s, int x, int y, int w, int h, const
     warn_once(&warned, "glDrawPixels");
 }
 
-static void gb_set_gamma(const uint16_t ramp[3][256]) { (void)ramp; }     /* no gamma control on the phone's compositor */
+static void gb_set_gamma(const uint16_t ramp[3][256])
+{
+    memcpy(g_ramp, ramp, sizeof g_ramp); g_ramp_set = 1; g_lut_dirty = 1;
+    H2_INFO(H2_LOG_GRAPHICS, "gamma ramp set by the game: R[0,64,128,192,255]=%u,%u,%u,%u,%u  G[128]=%u  B[128]=%u", ramp[0][0], ramp[0][64], ramp[0][128], ramp[0][192], ramp[0][255], ramp[1][128], ramp[2][128]);
+}
 
 static int gb_caps(int what)
 {
