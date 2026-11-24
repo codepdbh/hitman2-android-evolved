@@ -46,7 +46,7 @@ internal class CameraMotion {
 }
 
 internal object GamePointer {
-    fun point(x: Float, y: Float, left: Float, top: Float, width: Float, height: Float): Pair<Int, Int> =
-        ((x - left) * 800f / width.coerceAtLeast(1f)).toInt().coerceIn(0, 799) to
-            ((y - top) * 450f / height.coerceAtLeast(1f)).toInt().coerceIn(0, 449)
+    fun point(x: Float, y: Float, left: Float, top: Float, width: Float, height: Float, gameW: Int = 800, gameH: Int = 450): Pair<Int, Int> =
+        ((x - left) * gameW / width.coerceAtLeast(1f)).toInt().coerceIn(0, gameW - 1) to
+            ((y - top) * gameH / height.coerceAtLeast(1f)).toInt().coerceIn(0, gameH - 1)
 }

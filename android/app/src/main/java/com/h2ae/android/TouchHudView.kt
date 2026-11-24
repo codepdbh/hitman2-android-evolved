@@ -68,7 +68,6 @@ class TouchHudView(context: Context) : View(context) {
         const val N1 = 0x02; const val N2 = 0x03; const val N3 = 0x04; const val N4 = 0x05; const val N5 = 0x06; const val N6 = 0x07; const val N7 = 0x08
         const val NUM1 = 0x4F; const val NUM3 = 0x51
         const val MIN_PRESS_MS = 60L          // a tap must last long enough for the game's per-frame polling to see it
-        const val GAME_W = 800; const val GAME_H = 450
     }
 
     private val buttons = listOf(
@@ -137,6 +136,9 @@ class TouchHudView(context: Context) : View(context) {
     private var skipPointer = -1; private var gearPointer = -1; private var donePointer = -1
     /** The game's picture rectangle on screen, for mapping touches to game pixels. */
     var gameRect = RectF(0f, 0f, 1f, 1f)
+    /** The game's internal resolution (the ini's Resolution): touch positions are mapped to it. */
+    var gameW = 800
+    var gameH = 450
 
     /** 0 starting, 1 intro / logos, 2 menu, 3 mission (NativeBridge.gameContext). */
     private var ctx = 0
@@ -414,7 +416,7 @@ class TouchHudView(context: Context) : View(context) {
     private fun releaseJoy() { joyRunning = false; updateRunKey(); joyPointer = -1; joyDx = 0f; joyDy = 0f; for (i in 0..3) setJoy(i, false); invalidate() }
 
     private fun toGame(x: Float, y: Float): Pair<Int, Int> {
-        return GamePointer.point(x, y, gameRect.left, gameRect.top, gameRect.width(), gameRect.height())
+        return GamePointer.point(x, y, gameRect.left, gameRect.top, gameRect.width(), gameRect.height(), gameW, gameH)
     }
 
     /** The original menu calls GetCursorPos followed by ScreenToClient (guest 0041707B / 00417098). */
@@ -575,7 +577,7 @@ class TouchHudView(context: Context) : View(context) {
                         val dx = x - lookX; val dy = y - lookY
                         lookX = x; lookY = y
                         if (ctx == 3) {
-                            val gain = GAME_W / gameRect.width().coerceAtLeast(1f) * 1.6f * cameraSensitivity
+                            val gain = gameW / gameRect.width().coerceAtLeast(1f) * 1.6f * cameraSensitivity
                             val (mx, my) = cameraMotion.consume(dx, dy, gain)
                             if (mx != 0 || my != 0) NativeBridge.inputMouseMove(mx, my)
                         }

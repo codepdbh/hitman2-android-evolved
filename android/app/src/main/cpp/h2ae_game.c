@@ -151,6 +151,18 @@ static void *game_main(void *arg)
     pthread_mutex_unlock(&g_surface_lock);
     h2_gl_set_frame_hook(on_frame);
     h2_register_opengl();
+    {   /* The virtual display follows the profile's Resolution line, which the launcher writes. */
+        char ini[500], line[256]; int rw = 800, rh = 450;
+        snprintf(ini, sizeof ini, "%s/Hitman2.ini", g_user_dir);
+        FILE *f = fopen(ini, "r");
+        while (f && fgets(line, sizeof line, f)) {
+            int w, h;
+            if (sscanf(line, "Resolution %dx%d", &w, &h) == 2 && w >= 320 && h >= 240 && w <= 4096 && h <= 2304) { rw = w; rh = h; }
+        }
+        if (f) fclose(f);
+        h2_display_configure(rw, rh);
+        H2_INFO(H2_LOG_ANDROID, "virtual display %dx%d", rw, rh);
+    }
     h2_files_configure(g_game_dir, g_user_dir);
     snprintf(exe, sizeof exe, "%s/hitman2.exe", g_game_dir);
     if (h2_pe_load(exe, &img) != 0 || h2_process_init(&img) != 0) {

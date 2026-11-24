@@ -42,9 +42,12 @@ class GameActivity : Activity(), SurfaceHolder.Callback {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         val sv = SurfaceView(this)
-        sv.holder.setFixedSize(800, 450)
+        intent?.getStringExtra("res")?.takeIf { Regex("\\d{3,4}x\\d{3,4}|screen\\d{3,4}").matches(it) }?.let { options.prefs.edit().putString("resolution", it).apply() }   // tests: --es res 1280x720
+        val (resW, resH) = options.resolutionSize
+        sv.holder.setFixedSize(resW, resH)
         sv.holder.addCallback(this)
         hud = TouchHudView(this)
+        hud.gameW = resW; hud.gameH = resH
         val root = FrameLayout(this)
         root.setBackgroundColor(0xFF000000.toInt())
         root.addView(sv, FrameLayout.LayoutParams(1, 1, Gravity.CENTER))
@@ -56,11 +59,12 @@ class GameActivity : Activity(), SurfaceHolder.Callback {
         }
         root.addView(gameStatus, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT,
             FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.CENTER))
-        // Keep the original 16:9 picture undistorted, centred, with black bars; the HUD covers the whole screen.
+        // Keep the picture undistorted (its own aspect), centred, with black bars; the HUD covers the whole screen.
         root.addOnLayoutChangeListener { _, l, t, r, b, _, _, _, _ ->
             val w = r - l; val h = b - t
             if (w <= 0 || h <= 0) return@addOnLayoutChangeListener
-            val gw = minOf(w.toFloat(), h * 16f / 9f); val gh = gw * 9f / 16f
+            val aspect = resW.toFloat() / resH
+            val gw = minOf(w.toFloat(), h * aspect); val gh = gw / aspect
             val lp = sv.layoutParams as FrameLayout.LayoutParams
             if (lp.width != gw.toInt() || lp.height != gh.toInt()) { lp.width = gw.toInt(); lp.height = gh.toInt(); sv.layoutParams = lp }
             hud.gameRect = RectF((w - gw) / 2, (h - gh) / 2, (w + gw) / 2, (h + gh) / 2)

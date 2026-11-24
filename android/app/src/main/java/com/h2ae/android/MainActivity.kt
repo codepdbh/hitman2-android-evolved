@@ -176,6 +176,8 @@ class MainActivity : Activity() {
             2 -> {
                 heading("Gráficos y audio", "Audio, gráficos, subtítulos y clima se aplican al próximo arranque del motor.")
                 content.add(button("Perfil gráfico") { chooseGraphicsProfile() }, 12)
+                content.add(button("Resolución interna") { chooseResolution() }, 12)
+                content.add(label(options.resolution.replace("x", " × ") + if (options.resolution == "800x450") "  (original)" else "", 13f), 6)
                 val profile = options.prefs.getInt("graphics_profile", 0).coerceIn(0, 3)
                 content.add(label(tr(graphicsProfiles[profile]), 13f), 6)
                 content.add(label("Se usa el driver OpenGL ES de Android. Los perfiles Mali y Unisoc son experimentales; el modo de 16 bits puede reducir la precisión de profundidad.", 11f, muted), 8)
@@ -241,6 +243,15 @@ class MainActivity : Activity() {
         return "Soporte en el juego: pendiente.\n" + if (devices.isEmpty()) "Android no detecta ningún mando conectado." else "Android detecta: ${devices.joinToString { it.name }}. Aún no se traducen sus botones ni sticks al juego."
     }
     private val graphicsProfiles = listOf("Automático (recomendado)", "Mali · compatibilidad de 24 bits", "Unisoc · compatibilidad de 16 bits", "Snapdragon / Adreno")
+    private val resolutions = listOf("screen720" to "Ajustada a la pantalla, 720 líneas (sin bordes negros)", "screen900" to "Ajustada a la pantalla, 900 líneas", "800x450" to "800 × 450 (original, más rápido)", "1280x720" to "1280 × 720", "1600x900" to "1600 × 900", "1920x1080" to "1920 × 1080 (más nítido, más GPU)")
+    private fun chooseResolution() {
+        val current = resolutions.indexOfFirst { it.first == options.resolution }.coerceAtLeast(0)
+        AlertDialog.Builder(this).setTitle(tr("Resolución interna"))
+            .setSingleChoiceItems(resolutions.map { tr(it.second) }.toTypedArray(), current) { dialog, which ->
+                options.prefs.edit().putString("resolution", resolutions[which].first).apply()
+                dialog.dismiss(); showTab(2)
+            }.setNegativeButton(tr("Cancelar"), null).show()
+    }
     private fun chooseGraphicsProfile() {
         AlertDialog.Builder(this).setTitle(tr("Perfil gráfico"))
             .setSingleChoiceItems(graphicsProfiles.map { tr(it) }.toTypedArray(), options.prefs.getInt("graphics_profile", 0).coerceIn(0, 3)) { dialog, which ->
