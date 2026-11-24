@@ -1,5 +1,17 @@
 # Estado del proyecto
 
+## Actualización 2026-11-24 (pulido con el S25 conectado)
+
+Todo lo siguiente se **probó en el S25 (Adreno 830)** salvo lo marcado:
+
+- **Gamma:** el juego fija una rampa (`R[128]=42261`, es decir exponente ≈0,63, la del `GammaValue` del ini). Ahora la escena se dibuja a un framebuffer propio con MSAA 4x, se resuelve y se copia a pantalla a través de la rampa (`renderer/gl_gles3_backend.c`). El cuadro sale más claro, como el original. Sin comparación píxel a píxel con el original.
+- **Rendimiento medido:** 120 fps estables (v-sync a 120 Hz) en el cobertizo y en el patio de la misión 1, a 800×450, 1280×720 y 1560×720. Solo esas escenas.
+- **Pantalla completa sin bordes negros:** nueva resolución interna «ajustada a la pantalla» (por defecto, 720 líneas: 1560×720 en el S25); el juego dibuja una vista más ancha y el menú queda centrado. Otras opciones en el launcher: 800×450, 1280×720, 1600×900, 1920×1080, ajustada 900. `--es res <WxH|screenNNN>` para pruebas.
+- **Cursor del menú táctil:** el juego mueve su cursor con ratón relativo; el toque lo lleva a la esquina y lo desplaza (`objetivo / 2,7126`, factor medido) antes de pulsar. Comprobado: un toque en «Opciones» abre Opciones con el cursor sobre el elemento. El factor 2,7126 es una medida en un punto, no un modelo verificado en toda la pantalla.
+- **Mando Android** (`GamepadInput.kt`): sticks, gatillos, botones y cruceta según contexto. **Compilado, sin probar con un mando real.**
+- **Drivers de GPU:** escalera de sombreadores (3 variantes) e informe del driver, comprobado solo en Adreno (variante 0).
+- **Imports de sistema:** 0 sin función nativa; las rutas de guardar partida siguen sin ejercitarse.
+
 ## Preview v0.2.0-preview.1 — 2026-11-17
 
 - **Compilado:** APK ARM64 de desarrollo, `versionCode` 2; firma comprobada y paquete revisado sin datos originales ni claves. Preparado como adjunto de GitHub Releases, con SHA-256; no se versiona el APK en Git.

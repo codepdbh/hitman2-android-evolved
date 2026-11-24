@@ -304,7 +304,7 @@ JNIEXPORT void JNICALL Java_com_h2ae_android_NativeBridge_inputKey(JNIEnv *e, jo
 JNIEXPORT void JNICALL Java_com_h2ae_android_NativeBridge_inputMouseMove(JNIEnv *e, jobject t, jint dx, jint dy) { (void)e; (void)t; h2_input_mouse_move(dx, dy); }
 JNIEXPORT void JNICALL Java_com_h2ae_android_NativeBridge_inputMouseButton(JNIEnv *e, jobject t, jint i, jboolean down) { (void)e; (void)t; H2_INFO(H2_LOG_INPUT, "mouse button %d %s", (int)i, down ? "down" : "up"); h2_input_mouse_button((unsigned)i, down); }
 JNIEXPORT void JNICALL Java_com_h2ae_android_NativeBridge_inputWheel(JNIEnv *e, jobject t, jint dz) { (void)e; (void)t; h2_input_mouse_wheel(dz); }
-JNIEXPORT void JNICALL Java_com_h2ae_android_NativeBridge_inputCursor(JNIEnv *e, jobject t, jint x, jint y) { (void)e; (void)t; h2_input_cursor(x, y); }
+JNIEXPORT void JNICALL Java_com_h2ae_android_NativeBridge_inputCursor(JNIEnv *e, jobject t, jint x, jint y) { (void)e; (void)t; H2_INFO(H2_LOG_INPUT, "cursor %d,%d", (int)x, (int)y); h2_input_cursor(x, y); }
 JNIEXPORT void JNICALL Java_com_h2ae_android_NativeBridge_inputReset(JNIEnv *e, jobject t) { (void)e; (void)t; h2_input_reset(); }
 
 /* 0 boot, 1 intro/logos, 2 menu, 3 mission: see platform/game_context.c */

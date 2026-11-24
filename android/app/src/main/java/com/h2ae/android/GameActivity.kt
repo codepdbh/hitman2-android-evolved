@@ -16,6 +16,8 @@ import android.widget.FrameLayout
 import android.widget.TextView
 import android.view.SurfaceHolder
 import android.view.SurfaceView
+import android.view.KeyEvent
+import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import java.io.File
@@ -27,6 +29,7 @@ import java.io.File
  */
 class GameActivity : Activity(), SurfaceHolder.Callback {
     private lateinit var hud: TouchHudView
+    private val pad = GamepadInput()
     private lateinit var gameStatus: TextView
     private val ui = Handler(Looper.getMainLooper())
     private val monitor = object : Runnable {
@@ -132,8 +135,11 @@ class GameActivity : Activity(), SurfaceHolder.Callback {
         if (NativeBridge.gameLoadError == null) NativeBridge.setGamePaused(false)
         ui.post(monitor)
     }
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean = pad.onKey(event) || super.dispatchKeyEvent(event)
+    override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean = pad.onMotion(event) || super.dispatchGenericMotionEvent(event)
+
     override fun onPause() {
-        hud.releaseAll()
+        hud.releaseAll(); pad.releaseAll()
         if (NativeBridge.gameLoadError == null) NativeBridge.setGamePaused(true)
         ui.removeCallbacks(monitor)
         super.onPause()

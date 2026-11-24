@@ -240,7 +240,7 @@ class MainActivity : Activity() {
         val devices = InputDevice.getDeviceIds().map { InputDevice.getDevice(it) }.filterNotNull().filter {
             it.supportsSource(InputDevice.SOURCE_GAMEPAD) || it.supportsSource(InputDevice.SOURCE_JOYSTICK)
         }
-        return "Soporte en el juego: pendiente.\n" + if (devices.isEmpty()) "Android no detecta ningún mando conectado." else "Android detecta: ${devices.joinToString { it.name }}. Aún no se traducen sus botones ni sticks al juego."
+        return "Soporte en el juego: implementado (sin probar con un mando real).\n" + if (devices.isEmpty()) "Android no detecta ningún mando conectado." else "Android detecta: ${devices.joinToString { it.name }}.\nMisión: stick izq. = mover, stick der. = cámara, R2/R1 = disparar, L2 = correr, A = acción, B = agacharse, X = recargar, Y = inventario, L1 = sigilo, Start = pausa, Select = mapa. Menús: cruceta, A aceptar, B atrás."
     }
     private val graphicsProfiles = listOf("Automático (recomendado)", "Mali · compatibilidad de 24 bits", "Unisoc · compatibilidad de 16 bits", "Snapdragon / Adreno")
     private val resolutions = listOf("screen720" to "Ajustada a la pantalla, 720 líneas (sin bordes negros)", "screen900" to "Ajustada a la pantalla, 900 líneas", "800x450" to "800 × 450 (original, más rápido)", "1280x720" to "1280 × 720", "1600x900" to "1600 × 900", "1920x1080" to "1920 × 1080 (más nítido, más GPU)")
